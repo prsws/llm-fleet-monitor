@@ -1,0 +1,6 @@
+hostname,description,endpoint,ollama,whisper,piper
+mmm4-ollama,Ollama in Mac mini M4 24GB,192.168.10.3:11434,true,false,false
+mmm4-whisper,Wyoming whisper-large-v3 STT in Mac mini M4,192.168.10.3:10300,false,true,false
+mmm4-piper,Wyoming piper TTS in Mac mini M4,192.168.10.3:10200,false,false,true
+pepews4-ollama,Ollama in Dell G7 i7 32GB RTX2070 Super 8GB VRAM,192.168.10.2:11434,true,false,false
+macstudio-ollama,Ollama in Mac Studio M1 Ultra 64GB,192.168.10.5:11434,true,false,false

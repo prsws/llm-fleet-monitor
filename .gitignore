@@ -1,0 +1,23 @@
+# IDE
+.idea/
+.junie/
+
+# Claude Code
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# macOS
+.DS_Store
+
+# Secrets / local config
+*.env
+.env*
