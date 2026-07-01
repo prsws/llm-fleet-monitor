@@ -15,7 +15,7 @@ The tool monitors Ollama over its HTTP API and Whisper/Piper speech services ove
 ## 3. Recommended LXC Design
 Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel and are intended for lightweight Linux workloads; unprivileged containers improve isolation by mapping container root to an unprivileged host UID range.
 
-|Setting| Required value                                                              | Notes                                                                                                       
+|Setting| Required value                                                              | Notes                                                                                                       |
 |---|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
 |Hostname	| llmdm	                                                                      | Use this exact container hostname.                                                                          |
 |Container type	| Unprivileged LXC	                                                           | Preferred for this read-only monitoring workload.                                                           |
@@ -29,33 +29,35 @@ Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel a
 
 ## 4. Create the LXC in Proxmox VE 9.1
 ### 4.1 Create from the Proxmox web interface
-1.	Open the Proxmox VE web interface and select the target node.
-2.	Select Create CT.
-3.	Assign hostname llmdm.
-4.	Use an unprivileged container.
-5.	Select the debian_trixie.tar template from the Proxmox VE CT templates.
-6.	Set the root disk to 8 GB.
-7.	Allocate 1 core, 512 MB memory, and 512 MB swap.
-8.	Configure networking with static IP 192.168.10.41/24 and leave the container firewall disabled.
-9.	Set DNS to Use host settings.
-10.	Start the container and open its console.
+0. _Make sure you already have an OS image (e.g. debian-13-standard_13.1-2_amd64.tar.zst) loaded into PVE Templates before you begin._
+1. Open the Proxmox VE web interface and select the target node.
+2. Select Create CT.
+3. Assign hostname llmfm.
+4. Use an unprivileged container and enable nesting.
+5. Set root password.
+6. Select the debian-13-standard_13.1-2_amd64.tar.zst template from the Proxmox VE CT templates.
+7. Select where the storage resides in your PVE and set the root disk to 8 GB.
+8. Allocate 1 core, 512 MB memory, and 512 MB swap.
+9. Configure networking with static IPv4 192.168.10.41/24, IPv6 static but leave other fields empty and leave the container firewall disabled.
+10. Set DNS to Use host settings.
+11. Start the container and open its console.
 
 ### 4.2 Optional creation from the Proxmox host CLI
 Use these values for the CLI example. Adjust only the storage name, bridge, gateway, and CT ID if your Proxmox environment uses different names or numbering.
 ```
-pct create 121 local:vztmpl/debian_trixie.tar --hostname llmdm --unprivileged 1 --cores 1 --memory 512 --swap 512 --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=192.168.10.41/24,gw=<gateway-ip>,firewall=0 --nameserver host --features nesting=0 --start 1
+pct create 121 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname llmfm --unprivileged 1 --cores 1 --memory 512 --swap 512 --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=192.168.10.41/24,gw=192.168.10.1,firewall=0 --nameserver host --features nesting=1 --start 1
 ```
-Replace <gateway-ip> with the default gateway for the 192.168.10.0/24 network. Keep firewall=0 so the container firewall remains disabled, and keep DNS configured to use the host settings.
+Keep firewall=0 so the container firewall remains disabled, and keep DNS configured to use the host settings.
 
 ## 5. Prepare the Container OS
 Log in to the LXC console as root, update the base system, and install the small set of packages needed to clone the repository, run Python, and test network reachability.
 ```
 apt update
 apt full-upgrade -y
-apt install -y python3 git ca-certificates curl nano netcat-openbsd mc htop btop
-python3 --version
+apt install -y  curl git mc htop btop sudo
+timedatectl set-timezone America/Puerto_Rico
 ```
-Confirm that Python is version 3.8 or newer. No pip installation, virtual environment, framework, or third-party package is required.
+Confirm that Python is version 3.13 or newer (python3 -V). No pip installation, virtual environment, framework, or third-party package is required.
 
 ## 6. Install LLM Fleet Monitor
 Create a dedicated system user and place the application under /opt.
@@ -71,25 +73,25 @@ cd /opt/llm-fleet-monitor
 The monitor reads a CSV file with one row per service endpoint. A single row must select exactly one service type: Ollama, Whisper, or Piper.
 ```
 cd /opt/llm-fleet-monitor
-cp llm-fleet.csv.example llm-fleet.csv
-chown llmfleet:llmfleet llm-fleet.csv
-chmod 600 llm-fleet.csv
+cp example.llm-fleet.csv llm-fleet.csv
+chown llmfm:llmfm llm-fleet.csv
+chmod 644 llm-fleet.csv
 nano llm-fleet.csv
 ```
 Example CSV:
 
 |hostname	|description	|endpoint	|ollama	|whisper	| piper |
-|---|---|---|---|---|-------|
+|---|---|---|---|---|---|
 |gpu-box	|Main Ollama box	|192.168.1.20:11434	|true	|false	| false |
 |voice-stt	|Whisper speech-to-text	|192.168.1.30:10300	|false	|true	| false |
-|voice-tts	|Piper text-to-speech	|192.168.1.30:10200	|false	|false	| true  |
+|voice-tts	|Piper text-to-speech	|192.168.1.30:10200	|false	|false	| true |
 
 Keep the real CSV private. It contains internal hostnames, IP addresses, ports, and service roles. Add llm-fleet.csv to .gitignore and commit only sanitized examples.
 
 ## 8. Run the CLI Probe
 Run a one-shot readable report as the dedicated service user.
 ```
-sudo -u llmfleet python3 /opt/llm-fleet-monitor/llm-fleet-monitor.py /opt/llm-fleet-monitor/llm-fleet.csv
+sudo -u llmfm python3 llm-fleet-monitor.py llm-fleet.csv
 ```
 Useful probe options:
 
@@ -104,9 +106,9 @@ Useful probe options:
 Start the dashboard manually for initial testing.
 ```
 cd /opt/llm-fleet-monitor
-sudo -u llmfleet python3 gui.py --csv /opt/llm-fleet-monitor/llm-fleet.csv --port 8766
+sudo -u llmfm python3 gui.py --csv /opt/llm-fleet-monitor/llm-fleet.csv --port 8766
 ```
-By default, the dashboard binds to 127.0.0.1 and is reachable only from inside the LXC. The dashboard exposes:
+By default, the dashboard binds to 127.0.0.1:8766 and is reachable only from inside the LXC. The dashboard exposes:
 
 *	/ — full browser page with host cards.
 *	/fragment/hosts — host-card fragment polled by the page.
@@ -116,7 +118,10 @@ If you need to view the dashboard from another workstation, prefer an SSH tunnel
 ```
 ssh -L 8766:127.0.0.1:8766 root@<lxc-ip>
 ```
-Then open http://127.0.0.1:8766 on your workstation.
+Then open http://127.0.0.1:8766 on your workstation. **Not Tested** 
+
+_If you want to expose the dashboard publicly, edit gui.py and change its default host to 0.0.0.0. You can also change the port._ **Tested Ok**
+
 
 ## 10. Create a systemd Service for the Dashboard
 Create a service so the dashboard starts automatically when the LXC boots.
@@ -129,8 +134,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=llmfleet
-Group=llmfleet
+User=llmfm
+Group=llmfm
 WorkingDirectory=/opt/llm-fleet-monitor
 ExecStart=/usr/bin/python3 /opt/llm-fleet-monitor/gui.py --csv /opt/llm-fleet-monitor/llm-fleet.csv --port 8766
 Restart=on-failure
@@ -145,6 +150,7 @@ ReadWritePaths=/opt/llm-fleet-monitor
 WantedBy=multi-user.target
 EOF
 ```
+Then enable it:
 ```
 systemctl daemon-reload
 systemctl enable --now llm-fleet-dashboard.service
@@ -155,7 +161,7 @@ Review logs with:
 journalctl -u llm-fleet-dashboard.service -f
 ```
 
-## 11. Optional: Cron-Friendly CLI Monitoring
+## 11. Optional: Cron-Friendly CLI Monitoring **Not Tested**
 If you want a simple scheduled health check, create a wrapper script that exits non-zero when any endpoint is unreachable.
 ```
 cat > /usr/local/bin/llm-fleet-check <<'EOF'
@@ -178,10 +184,10 @@ The LXC must be able to initiate outbound TCP connections to every endpoint list
 
 Basic reachability tests from inside the LXC:
 ```
-nc -vz 192.168.1.20 11434
-curl -s http://192.168.1.20:11434/api/version
-nc -vz 192.168.1.30 10300
-nc -vz 192.168.1.30 10200
+nc -vz 192.168.10.5 11434
+curl -s http://192.168.10.5:11434/api/version
+nc -vz 192.168.10.5 10300
+nc -vz 192.168.10.5 10200
 ```
 
 ## 13. Security Notes
@@ -197,14 +203,14 @@ Update the checked-out repository and restart the dashboard service.
 ```
 cd /opt/llm-fleet-monitor
 git pull
-chown -R llmfleet:llmfleet /opt/llm-fleet-monitor
+chown -R llmfm:llmfm /opt/llm-fleet-monitor
 systemctl restart llm-fleet-dashboard.service
 systemctl status llm-fleet-dashboard.service
 ```
 Before updating, copy or commit any local changes outside the private CSV. Do not overwrite llm-fleet.csv unless you intentionally want to replace the host list.
 
 ## 15. Validation Checklist
-* python3 --version reports Python 3.8 or newer.
+* python3 --version reports Python 3.13 or newer.
 * llm-fleet.csv exists, has a header row, and each service row has exactly one true provider flag.
 * The CLI probe produces a readable report.
 * --json produces a single JSON envelope with schema_version, probed_at, and results.
