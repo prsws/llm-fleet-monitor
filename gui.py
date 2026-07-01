@@ -176,7 +176,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
 
                 loaded = o.get("loaded") or []
                 if loaded:
-                    parts.append("<details open><summary>loaded (ps)</summary><ul>")
+                    parts.append("<details open><summary>Loaded (ps)</summary><ul>")
                     for m in loaded:
                         name = html_escape(str(m.get("name") or "?"))
                         size = human_size(m.get("size"))
@@ -187,14 +187,14 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         ttl = human_ttl(m.get("ttl_seconds")) if m.get("ttl_seconds") is not None else "?"
                         spill_note = " — <strong>SPILLED</strong>" if spilled else ""
                         parts.append(
-                            f"<li><code>{name}</code> {size} • vram {vram} ({gpu_pct} GPU){spill_note} • ttl {ttl}</li>"
+                            f"<li><code>{name}</code> {size} • VRAM {vram} ({gpu_pct} GPU){spill_note} • TTL {ttl}</li>"
                         )
                     parts.append("</ul></details>")
                 else:
-                    parts.append("<p>up, nothing loaded</p>")
+                    parts.append("<p>Up, nothing loaded</p>")
 
                 inv = o.get("downloaded") or []
-                parts.append(f"<p>downloaded (ls): {len(inv)} model{'s' if len(inv)!=1 else ''}</p>")
+                parts.append(f"<p>Downloaded (ls): {len(inv)} model{'s' if len(inv)!=1 else ''}</p>")
                 if inv:
                     names: List[str] = []
                     for m in inv:
