@@ -232,9 +232,8 @@ Before updating, copy or commit any local changes outside the private CSV. Do no
 |Service fails after update	| Changed path, permissions, or Python script behavior	                                                                                  | Run the CLI manually as llmfleet, then review journalctl -u llm-fleet-dashboard.service.               |
 
 ## 17. Operational Notes
-•	The monitor is read-only and does not modify the inference hosts it checks.
-•	A dead or slow host should not abort a sweep; it is reported as unreachable.
-•	The JSON schema is versioned. Consumers should read schema_version and tolerate added fields.
-•	SPILLED in Ollama output indicates a model is only partially resident in GPU memory and has fallen back to system RAM.
-•	HTMX is vendored locally as htmax.js, while Pico.css is loaded by the browser from a CDN at runtime.
-
+* The monitor is read-only and does not modify the inference hosts it checks.
+* A dead or slow host should not abort a sweep; it is reported as unreachable.	
+* The JSON schema is versioned. Consumers should read schema_version and tolerate added fields.	
+* SPILLED in Ollama output indicates a model is only partially resident in GPU memory and has fallen back to system RAM.	
+* HTMX is vendored locally as htmax.js, while Pico.css is loaded by the browser from a CDN at runtime.
