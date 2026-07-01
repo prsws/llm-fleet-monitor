@@ -247,13 +247,6 @@ def render_full_page(env: Dict[str, Any]) -> str:
     fragment = render_cards_fragment(env)
     # Pico.css and HTMX 4 (exact pin) + requested extensions
     pico_css = "https://unpkg.com/@picocss/pico@2.0.6/css/pico.min.css"
-    # COMMENTED OUT ON PURPOSE BY JOSE 20260630 - replace htmx4 cdn with local downloaded htmax.js - DO NOT MODIFY
-    # htmx_src = (
-    #     "https://cdn.jsdelivr.net/npm/htmx.org@4.0.0-beta5"
-    # )
-    # htmx_sri = (
-    #     "sha384-5dnhUXCt1hXGvYrjAnKwgNX3I8xtIJiW6eIHIbeo7oWyXv2XpWYC/rl+ZiWfuYO5"
-    # )
     htmx_src = (
         "/htmax.js"
     )

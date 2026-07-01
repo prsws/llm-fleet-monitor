@@ -22,7 +22,7 @@ Both are **pure Python standard library** — no `pip install`, no frameworks.
 - Python **3.8 or newer**.
 - That's it. No third-party packages.
 
-The web dashboard loads [Pico.css](https://picocss.com/) and [HTMX](https://htmx.org/) from a CDN at runtime, so the browser needs internet access for styling and polling. (Note: the dashboard currently pins **HTMX 4, which is a pre-release/beta** — see *Notes* below.)
+The web dashboard loads [Pico.css](https://picocss.com/) from a CDN at runtime (so the browser needs internet access for styling). **HTMX is not loaded from a CDN — it's vendored locally** in this repo as `htmax.js`; see *Notes* below for why.
 
 ---
 
@@ -163,11 +163,17 @@ To add a provider later, the design is meant to grow by adding a new boolean col
 
 ## Notes & known rough edges
 
-- **HTMX 4 is pre-release.** The dashboard pins an exact HTMX 4 beta build from a CDN. It works, but it's a beta dependency — pin/upgrade deliberately if you fork this.
+- **HTMX is vendored locally, not loaded from a CDN.** The dashboard uses **HTMX 4** (a pre-release/beta at time of writing), served from the `htmax.js` file bundled in this repo rather than from a CDN. Reason: when loaded from the CDN with a pinned Subresource Integrity (SRI) hash, the browser refused to execute the beta build (SRI / cross-origin enforcement — a moving pre-release artifact and a pinned hash don't reliably agree). Serving a vetted local copy sidesteps that entirely and, as a bonus, means the dashboard's interactivity has no external CDN dependency. If you fork this and move to a stable HTMX release, you can switch back to a CDN `<script>` tag with a matching SRI hash, or keep vendoring — both work.
+- **`htmax.js` shows up as JavaScript in GitHub's language bar.** That's expected — it's a real vendored library file. To have GitHub classify the repo as Python, add a `.gitattributes` marking it vendored: `htmax.js linguist-vendored`.
 - **Default port:** the dashboard serves on **8766**. (An older `--help` string may still say 8765; 8766 is the value the code uses.)
 - The dashboard is intentionally tiny and localhost-only. If you want to expose it on a LAN or add authentication, that's on you — it ships with no auth.
 
 ---
+
+## Third-party components
+
+- **HTMX** (`htmax.js`, vendored in this repo) — © Big Sky Software, licensed **[0BSD](https://opensource.org/license/0bsd) (Zero-Clause BSD)**. 0BSD is public-domain-equivalent and requires no attribution; this note is provenance, not obligation. Upstream: [htmx.org](https://htmx.org/).
+- **Pico.css** (loaded from CDN) — licensed **MIT**. Upstream: [picocss.com](https://picocss.com/).
 
 ## License
 
