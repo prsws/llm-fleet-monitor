@@ -15,17 +15,17 @@ The tool monitors Ollama over its HTTP API and Whisper/Piper speech services ove
 ## 3. Recommended LXC Design
 Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel and are intended for lightweight Linux workloads; unprivileged containers improve isolation by mapping container root to an unprivileged host UID range.
 
-|Setting| Required value                                                              | Notes                                                                                                       |
-|---|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
-|Hostname	| llmdm	                                                                      | Use this exact container hostname.                                                                          |
-|Container type	| Unprivileged LXC	                                                           | Preferred for this read-only monitoring workload.                                                           |
-|OS template	| debian_trixie.tar from Proxmox VE CT templates	                             | Select the downloaded Debian Trixie container template.                                                     |
-|CPU	| 1 core	                                                                     | Sufficient for the lightweight Python probe and dashboard.                                                  |
-|Memory	| 512 MB RAM, 512 MB swap	                                                    | The app has no third-party Python dependencies.                                                             |
-|Disk	| 8 GB	                                                                       | Provides room for OS packages, Git checkout, logs, and updates.                                             |
-|Network	| Static IP <your-ip-here>/24	| Disable the Proxmox firewall for this container.|                                                            |
-|DNS	| Use host settings	                                                          | In the CT wizard, keep DNS set to use the Proxmox host configuration.                                       |
-|Features	| Nesting not required	                                                       | Enable nesting only if your broader container policy requires it; this app does not run Docker or nested containers. |
+|Setting| Required value                                  | Notes                                                                                                                |
+|---|-------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+|Hostname	| llmfm	                                          | Or your preferred container hostname.                                                                                |
+|Container type	| Unprivileged LXC	                               | Preferred for this read-only monitoring workload.                                                                    |
+|OS template	| debian-13-standard_13.1-2_amd64.tar.zst	 | Select a downloaded Debian Trixie container template.                                                                |
+|CPU	| 1 core	                                         | Sufficient for the lightweight Python probe and dashboard.                                                           |
+|Memory	| 256 MB RAM, 256 MB swap	                        | The app has no third-party Python dependencies.                                                                      |
+|Disk	| 8 GB	                                           | Provides room for OS packages, Git checkout, logs, and updates.                                                      |
+|Network	| Static IP <your-ip-here>/24	                    | Disable the Proxmox firewall for this container.                                                                     |                                                            |
+|DNS	| Use host settings	                              | In the CT wizard, keep DNS set to use the Proxmox host configuration.                                                |
+|Features	| Nesting not required	                           | Enable nesting only if your broader container policy requires it; this app does not run Docker or nested containers. |
 
 ## 4. Create the LXC in Proxmox VE 9.1
 ### 4.1 Create from the Proxmox web interface
@@ -37,7 +37,7 @@ Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel a
 5. Set root password.
 6. Select the debian-13-standard_13.1-2_amd64.tar.zst template from the Proxmox VE CT templates.
 7. Select where the storage resides in your PVE and set the root disk to 8 GB.
-8. Allocate 1 core, 512 MB memory, and 512 MB swap.
+8. Allocate 1 core, 256 MB memory, and 256 MB swap.
 9. Configure networking with static IPv4 <your-ip-here>/24, IPv6 static but leave other fields empty and leave the container firewall disabled.
 10. Set DNS to Use host settings.
 11. Start the container and open its console.
@@ -45,7 +45,7 @@ Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel a
 ### 4.2 Optional creation from the Proxmox host CLI
 Use these values for the CLI example. Adjust only the storage name, bridge, gateway, and CT ID if your Proxmox environment uses different names or numbering.
 ```
-pct create 121 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname llmfm --unprivileged 1 --cores 1 --memory 512 --swap 512 --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=<your-ip-here>/24,gw=<your-ip-here>,firewall=0 --nameserver host --features nesting=1 --start 1
+pct create 121 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname llmfm --unprivileged 1 --cores 1 --memory 256 --swap 256 --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=<your-ip-here>/24,gw=<your-ip-here>,firewall=0 --nameserver host --features nesting=1 --start 1
 ```
 Keep firewall=0 so the container firewall remains disabled, and keep DNS configured to use the host settings.
 
@@ -57,7 +57,7 @@ apt full-upgrade -y
 apt install -y  curl git mc htop btop sudo
 timedatectl set-timezone America/Puerto_Rico
 ```
-Confirm that Python is version 3.13 or newer (python3 -V). No pip installation, virtual environment, framework, or third-party package is required.
+Confirm that Python is version 3.8 or newer (python3 -V). No pip installation, virtual environment, framework, or third-party package is required.
 
 ## 6. Install LLM Fleet Monitor
 Create a dedicated system user and place the application under /opt.
@@ -195,7 +195,7 @@ nc -vz <your-ip-here> 10200
 * Do not expose the dashboard to an untrusted network without adding an external authentication and reverse-proxy layer.
 * Keep llm-fleet.csv private because it maps internal inference services.
 * Do not store secrets in the CSV; the current probes do not require credentials.
-* Restrict file permissions so only root and the llmfleet user can read operational files.
+* Restrict file permissions so only root and the llmfm user can read operational files.
 * Patch the container regularly with apt update and apt full-upgrade.
 
 # 14. Updating the Application
@@ -210,7 +210,7 @@ systemctl status llm-fleet-dashboard.service
 Before updating, copy or commit any local changes outside the private CSV. Do not overwrite llm-fleet.csv unless you intentionally want to replace the host list.
 
 ## 15. Validation Checklist
-* python3 --version reports Python 3.13 or newer.
+* python3 --version reports Python 3.8 or newer.
 * llm-fleet.csv exists, has a header row, and each service row has exactly one true provider flag.
 * The CLI probe produces a readable report.
 * --json produces a single JSON envelope with schema_version, probed_at, and results.
@@ -229,11 +229,11 @@ Before updating, copy or commit any local changes outside the private CSV. Do no
 |DNS failure	| Container cannot resolve the hostname	                                                                                                 | Check the LXC DNS settings in Proxmox or use a static IP in the CSV.                                   |
 |Dashboard starts but browser looks unstyled	| The browser cannot load Pico.css from the CDN	| Allow browser internet access for styling or accept the unstyled functional page.                      |
 |Dashboard not reachable from another machine	| It binds to localhost by design	| Use an SSH tunnel, or intentionally place it behind a secured reverse proxy if LAN access is required. | 
-|Service fails after update	| Changed path, permissions, or Python script behavior	                                                                                  | Run the CLI manually as llmfleet, then review journalctl -u llm-fleet-dashboard.service.               |
+|Service fails after update	| Changed path, permissions, or Python script behavior	                                                                                  | Run the CLI manually as llmfm, then review journalctl -u llm-fleet-dashboard.service.                  |
 
 ## 17. Operational Notes
 * The monitor is read-only and does not modify the inference hosts it checks.
 * A dead or slow host should not abort a sweep; it is reported as unreachable.	
-* The JSON schema is versioned. Consumers should read schema_version and tolerate added fields.	
+* The JSON schema is versioned. Consumers should read schema_version and tolerate added fields because they're coming!
 * SPILLED in Ollama output indicates a model is only partially resident in GPU memory and has fallen back to system RAM.	
 * HTMX is vendored locally as htmax.js, while Pico.css is loaded by the browser from a CDN at runtime.
