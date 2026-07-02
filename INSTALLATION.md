@@ -218,7 +218,15 @@ Before updating, copy or commit any local changes outside the private CSV. Do no
 * curl http://127.0.0.1:8766/status.json returns current status from inside the LXC.
 *	Expected unreachable endpoints are classified as timeout, refused, DNS, or protocol rather than crashing the sweep.
 
-## 16. Troubleshooting
+## 16. Running Tests
+
+```
+cd tests
+python3 -m unittest llm_fleet_monitor_tests.py
+python3 -m unittest gui_tests.py
+```
+
+## 17. Troubleshooting
 
 |Symptom	| Likely Cause	                                                                                                                          | Action                                                                                                 |
 |---|----------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
@@ -231,7 +239,7 @@ Before updating, copy or commit any local changes outside the private CSV. Do no
 |Dashboard not reachable from another machine	| It binds to localhost by design	| Use an SSH tunnel, or intentionally place it behind a secured reverse proxy if LAN access is required. | 
 |Service fails after update	| Changed path, permissions, or Python script behavior	                                                                                  | Run the CLI manually as llmfm, then review journalctl -u llm-fleet-dashboard.service.                  |
 
-## 17. Operational Notes
+## 18. Operational Notes
 * The monitor is read-only and does not modify the inference hosts it checks.
 * A dead or slow host should not abort a sweep; it is reported as unreachable.	
 * The JSON schema is versioned. Consumers should read schema_version and tolerate added fields because they're coming!
