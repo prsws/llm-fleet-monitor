@@ -23,7 +23,7 @@ Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel a
 |CPU	| 1 core	                                                                     | Sufficient for the lightweight Python probe and dashboard.                                                  |
 |Memory	| 512 MB RAM, 512 MB swap	                                                    | The app has no third-party Python dependencies.                                                             |
 |Disk	| 8 GB	                                                                       | Provides room for OS packages, Git checkout, logs, and updates.                                             |
-|Network	| Static IP 192.168.10.41/24	| Disable the Proxmox firewall for this container.|                                                            |
+|Network	| Static IP <your-ip-here>/24	| Disable the Proxmox firewall for this container.|                                                            |
 |DNS	| Use host settings	                                                          | In the CT wizard, keep DNS set to use the Proxmox host configuration.                                       |
 |Features	| Nesting not required	                                                       | Enable nesting only if your broader container policy requires it; this app does not run Docker or nested containers. |
 
@@ -38,14 +38,14 @@ Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel a
 6. Select the debian-13-standard_13.1-2_amd64.tar.zst template from the Proxmox VE CT templates.
 7. Select where the storage resides in your PVE and set the root disk to 8 GB.
 8. Allocate 1 core, 512 MB memory, and 512 MB swap.
-9. Configure networking with static IPv4 192.168.10.41/24, IPv6 static but leave other fields empty and leave the container firewall disabled.
+9. Configure networking with static IPv4 <your-ip-here>/24, IPv6 static but leave other fields empty and leave the container firewall disabled.
 10. Set DNS to Use host settings.
 11. Start the container and open its console.
 
 ### 4.2 Optional creation from the Proxmox host CLI
 Use these values for the CLI example. Adjust only the storage name, bridge, gateway, and CT ID if your Proxmox environment uses different names or numbering.
 ```
-pct create 121 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname llmfm --unprivileged 1 --cores 1 --memory 512 --swap 512 --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=192.168.10.41/24,gw=192.168.10.1,firewall=0 --nameserver host --features nesting=1 --start 1
+pct create 121 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname llmfm --unprivileged 1 --cores 1 --memory 512 --swap 512 --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=<your-ip-here>/24,gw=<your-ip-here>,firewall=0 --nameserver host --features nesting=1 --start 1
 ```
 Keep firewall=0 so the container firewall remains disabled, and keep DNS configured to use the host settings.
 
@@ -82,9 +82,9 @@ Example CSV:
 
 |hostname	|description	|endpoint	|ollama	|whisper	| piper |
 |---|---|---|---|---|---|
-|gpu-box	|Main Ollama box	|192.168.1.20:11434	|true	|false	| false |
-|voice-stt	|Whisper speech-to-text	|192.168.1.30:10300	|false	|true	| false |
-|voice-tts	|Piper text-to-speech	|192.168.1.30:10200	|false	|false	| true |
+|gpu-box	|Main Ollama box	|<your-ip-here>:11434	|true	|false	| false |
+|voice-stt	|Whisper speech-to-text	|<your-ip-here>:10300	|false	|true	| false |
+|voice-tts	|Piper text-to-speech	|<your-ip-here>:10200	|false	|false	| true |
 
 Keep the real CSV private. It contains internal hostnames, IP addresses, ports, and service roles. Add llm-fleet.csv to .gitignore and commit only sanitized examples.
 
@@ -184,10 +184,10 @@ The LXC must be able to initiate outbound TCP connections to every endpoint list
 
 Basic reachability tests from inside the LXC:
 ```
-nc -vz 192.168.10.5 11434
-curl -s http://192.168.10.5:11434/api/version
-nc -vz 192.168.10.5 10300
-nc -vz 192.168.10.5 10200
+nc -vz <your-ip-here> 11434
+curl -s http://<your-ip-here>:11434/api/version
+nc -vz <your-ip-here> 10300
+nc -vz <your-ip-here> 10200
 ```
 
 ## 13. Security Notes
