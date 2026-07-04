@@ -46,7 +46,7 @@ DEFAULT_CSV = HERE / "llm-fleet.csv"
 PROBE_PATH = HERE / "llm-fleet-monitor.py"
 FIXTURE_JSON = HERE / "sample.json"
 
-HOST = "127.0.0.1"
+HOST = "127.0.0.1"      # use 0.0.0.0 for external access (unsecure)
 DEFAULT_PORT = 8766
 REFRESH_SECONDS = 10
 
@@ -387,7 +387,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="LLM Fleet Monitor — tiny stdlib GUI")
     p.add_argument("--fixture", action="store_true", help="Serve HERE/sample.json instead of probing")
     p.add_argument("--csv", type=str, default=str(DEFAULT_CSV), help="Path to llm-fleet.csv (default: HERE/llm-fleet.csv)")
-    p.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind (default 8765)")
+    p.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind (default 8766)")
     args = p.parse_args(argv)
 
     csv_path = Path(args.csv).resolve()

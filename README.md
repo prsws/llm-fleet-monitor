@@ -33,7 +33,7 @@ git clone https://github.com/<your-user>/llm-fleet-monitor.git
 cd llm-fleet-monitor
 
 # 1. Create your host list (see "The host list" below)
-cp llm-fleet.csv.example llm-fleet.csv
+cp example.llm-fleet.csv llm-fleet.csv
 $EDITOR llm-fleet.csv
 
 # 2. Run the probe — one-shot readable report
