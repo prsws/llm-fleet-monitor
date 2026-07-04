@@ -29,12 +29,12 @@ The web dashboard loads [Pico.css](https://picocss.com/) from a CDN at runtime (
 ## Quick start
 
 ```bash
-git clone https://github.com/<your-user>/llm-fleet-monitor.git
+git clone https://github.com/prsws/llm-fleet-monitor.git
 cd llm-fleet-monitor
 
 # 1. Create your host list (see "The host list" below)
-cp llm-fleet.csv llm-fleet.csv
-$EDITOR llm-fleet.csv
+cp example.llm-fleet.csv llm-fleet.csv
+nano llm-fleet.csv
 
 # 2. Run the probe — one-shot readable report
 python3 llm-fleet-monitor.py llm-fleet.csv
