@@ -1,0 +1,1405 @@
+{
+  "schema_version": 1,
+  "probed_at": "2026-07-04T08:12:04-04:00",
+  "results": [
+    {
+      "hostname": "mmm4-whisper",
+      "description": "Wyoming whisper-large-v3 STT in Mac mini M4",
+      "endpoint": "192.168.10.3:10300",
+      "provider": "whisper",
+      "reachable": true,
+      "latency_ms": 5,
+      "error": null,
+      "ollama": null,
+      "whisper": {
+        "program": "mlx-whisper",
+        "version": "1.4.0",
+        "models": [
+          {
+            "name": "mlx-community/whisper-large-v3-turbo",
+            "languages": [
+              "af",
+              "am",
+              "ar",
+              "as",
+              "az",
+              "ba",
+              "be",
+              "bg",
+              "bn",
+              "bo",
+              "br",
+              "bs",
+              "ca",
+              "cs",
+              "cy",
+              "da",
+              "de",
+              "el",
+              "en",
+              "es",
+              "et",
+              "eu",
+              "fa",
+              "fi",
+              "fo",
+              "fr",
+              "gl",
+              "gu",
+              "ha",
+              "haw",
+              "he",
+              "hi",
+              "hr",
+              "ht",
+              "hu",
+              "hy",
+              "id",
+              "is",
+              "it",
+              "ja",
+              "jw",
+              "ka",
+              "kk",
+              "km",
+              "kn",
+              "ko",
+              "la",
+              "lb",
+              "ln",
+              "lo",
+              "lt",
+              "lv",
+              "mg",
+              "mi",
+              "mk",
+              "ml",
+              "mn",
+              "mr",
+              "ms",
+              "mt",
+              "my",
+              "ne",
+              "nl",
+              "nn",
+              "no",
+              "oc",
+              "pa",
+              "pl",
+              "ps",
+              "pt",
+              "ro",
+              "ru",
+              "sa",
+              "sd",
+              "si",
+              "sk",
+              "sl",
+              "sn",
+              "so",
+              "sq",
+              "sr",
+              "su",
+              "sv",
+              "sw",
+              "ta",
+              "te",
+              "tg",
+              "th",
+              "tk",
+              "tl",
+              "tr",
+              "tt",
+              "uk",
+              "ur",
+              "uz",
+              "vi",
+              "yi",
+              "yo",
+              "zh"
+            ]
+          }
+        ]
+      },
+      "piper": null
+    },
+    {
+      "hostname": "mmm4-piper",
+      "description": "Wyoming piper TTS in Mac mini M4",
+      "endpoint": "192.168.10.3:10200",
+      "provider": "piper",
+      "reachable": true,
+      "latency_ms": 19,
+      "error": null,
+      "ollama": null,
+      "whisper": null,
+      "piper": {
+        "program": "piper",
+        "version": "2.2.2",
+        "voices": [
+          {
+            "name": "ar_JO-kareem-low",
+            "languages": [
+              "ar_JO"
+            ]
+          },
+          {
+            "name": "ar_JO-kareem-medium",
+            "languages": [
+              "ar_JO"
+            ]
+          },
+          {
+            "name": "bg_BG-dimitar-medium",
+            "languages": [
+              "bg_BG"
+            ]
+          },
+          {
+            "name": "ca_ES-upc_ona-medium",
+            "languages": [
+              "ca_ES"
+            ]
+          },
+          {
+            "name": "ca_ES-upc_ona-x_low",
+            "languages": [
+              "ca_ES"
+            ]
+          },
+          {
+            "name": "ca_ES-upc_pau-x_low",
+            "languages": [
+              "ca_ES"
+            ]
+          },
+          {
+            "name": "cs_CZ-jirka-low",
+            "languages": [
+              "cs_CZ"
+            ]
+          },
+          {
+            "name": "cs_CZ-jirka-medium",
+            "languages": [
+              "cs_CZ"
+            ]
+          },
+          {
+            "name": "cy_GB-bu_tts-medium",
+            "languages": [
+              "cy_GB"
+            ]
+          },
+          {
+            "name": "cy_GB-gwryw_gogleddol-medium",
+            "languages": [
+              "cy_GB"
+            ]
+          },
+          {
+            "name": "da_DK-talesyntese-medium",
+            "languages": [
+              "da_DK"
+            ]
+          },
+          {
+            "name": "de_DE-eva_k-x_low",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-karlsson-low",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-kerstin-low",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-mls-medium",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-pavoque-low",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-ramona-low",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-thorsten-high",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-thorsten-low",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-thorsten-medium",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "de_DE-thorsten_emotional-medium",
+            "languages": [
+              "de_DE"
+            ]
+          },
+          {
+            "name": "el_GR-rapunzelina-low",
+            "languages": [
+              "el_GR"
+            ]
+          },
+          {
+            "name": "el_GR-rapunzelina-medium",
+            "languages": [
+              "el_GR"
+            ]
+          },
+          {
+            "name": "en_GB-alan-low",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-alan-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-alba-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-aru-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-cori-high",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-cori-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-jenny_dioco-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-northern_english_male-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-semaine-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-southern_english_female-low",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_GB-vctk-medium",
+            "languages": [
+              "en_GB"
+            ]
+          },
+          {
+            "name": "en_US-amy-low",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-amy-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-arctic-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-bryce-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-danny-low",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-hfc_female-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-hfc_male-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-joe-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-john-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-kathleen-low",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-kristin-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-kusal-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-l2arctic-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-lessac-high",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-lessac-low",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-lessac-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-libritts-high",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-libritts_r-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-ljspeech-high",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-ljspeech-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-norman-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-reza_ibrahim-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-ryan-high",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-ryan-low",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-ryan-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "en_US-sam-medium",
+            "languages": [
+              "en_US"
+            ]
+          },
+          {
+            "name": "es_AR-daniela-high",
+            "languages": [
+              "es_AR"
+            ]
+          },
+          {
+            "name": "es_ES-carlfm-x_low",
+            "languages": [
+              "es_ES"
+            ]
+          },
+          {
+            "name": "es_ES-davefx-medium",
+            "languages": [
+              "es_ES"
+            ]
+          },
+          {
+            "name": "es_ES-mls_10246-low",
+            "languages": [
+              "es_ES"
+            ]
+          },
+          {
+            "name": "es_ES-mls_9972-low",
+            "languages": [
+              "es_ES"
+            ]
+          },
+          {
+            "name": "es_ES-sharvard-medium",
+            "languages": [
+              "es_ES"
+            ]
+          },
+          {
+            "name": "es_MX-ald-medium",
+            "languages": [
+              "es_MX"
+            ]
+          },
+          {
+            "name": "es_MX-claude-high",
+            "languages": [
+              "es_MX"
+            ]
+          },
+          {
+            "name": "fa_IR-amir-medium",
+            "languages": [
+              "fa_IR"
+            ]
+          },
+          {
+            "name": "fa_IR-ganji-medium",
+            "languages": [
+              "fa_IR"
+            ]
+          },
+          {
+            "name": "fa_IR-ganji_adabi-medium",
+            "languages": [
+              "fa_IR"
+            ]
+          },
+          {
+            "name": "fa_IR-gyro-medium",
+            "languages": [
+              "fa_IR"
+            ]
+          },
+          {
+            "name": "fa_IR-reza_ibrahim-medium",
+            "languages": [
+              "fa_IR"
+            ]
+          },
+          {
+            "name": "fi_FI-harri-low",
+            "languages": [
+              "fi_FI"
+            ]
+          },
+          {
+            "name": "fi_FI-harri-medium",
+            "languages": [
+              "fi_FI"
+            ]
+          },
+          {
+            "name": "fr_FR-gilles-low",
+            "languages": [
+              "fr_FR"
+            ]
+          },
+          {
+            "name": "fr_FR-mls-medium",
+            "languages": [
+              "fr_FR"
+            ]
+          },
+          {
+            "name": "fr_FR-mls_1840-low",
+            "languages": [
+              "fr_FR"
+            ]
+          },
+          {
+            "name": "fr_FR-siwis-low",
+            "languages": [
+              "fr_FR"
+            ]
+          },
+          {
+            "name": "fr_FR-siwis-medium",
+            "languages": [
+              "fr_FR"
+            ]
+          },
+          {
+            "name": "fr_FR-tom-medium",
+            "languages": [
+              "fr_FR"
+            ]
+          },
+          {
+            "name": "fr_FR-upmc-medium",
+            "languages": [
+              "fr_FR"
+            ]
+          },
+          {
+            "name": "hi_IN-pratham-medium",
+            "languages": [
+              "hi_IN"
+            ]
+          },
+          {
+            "name": "hi_IN-priyamvada-medium",
+            "languages": [
+              "hi_IN"
+            ]
+          },
+          {
+            "name": "hi_IN-rohan-medium",
+            "languages": [
+              "hi_IN"
+            ]
+          },
+          {
+            "name": "hu_HU-anna-medium",
+            "languages": [
+              "hu_HU"
+            ]
+          },
+          {
+            "name": "hu_HU-berta-medium",
+            "languages": [
+              "hu_HU"
+            ]
+          },
+          {
+            "name": "hu_HU-imre-medium",
+            "languages": [
+              "hu_HU"
+            ]
+          },
+          {
+            "name": "id_ID-news_tts-medium",
+            "languages": [
+              "id_ID"
+            ]
+          },
+          {
+            "name": "is_IS-bui-medium",
+            "languages": [
+              "is_IS"
+            ]
+          },
+          {
+            "name": "is_IS-salka-medium",
+            "languages": [
+              "is_IS"
+            ]
+          },
+          {
+            "name": "is_IS-steinn-medium",
+            "languages": [
+              "is_IS"
+            ]
+          },
+          {
+            "name": "is_IS-ugla-medium",
+            "languages": [
+              "is_IS"
+            ]
+          },
+          {
+            "name": "it_IT-paola-medium",
+            "languages": [
+              "it_IT"
+            ]
+          },
+          {
+            "name": "it_IT-riccardo-x_low",
+            "languages": [
+              "it_IT"
+            ]
+          },
+          {
+            "name": "ka_GE-natia-medium",
+            "languages": [
+              "ka_GE"
+            ]
+          },
+          {
+            "name": "kk_KZ-iseke-x_low",
+            "languages": [
+              "kk_KZ"
+            ]
+          },
+          {
+            "name": "kk_KZ-issai-high",
+            "languages": [
+              "kk_KZ"
+            ]
+          },
+          {
+            "name": "kk_KZ-raya-x_low",
+            "languages": [
+              "kk_KZ"
+            ]
+          },
+          {
+            "name": "lb_LU-marylux-medium",
+            "languages": [
+              "lb_LU"
+            ]
+          },
+          {
+            "name": "lv_LV-aivars-medium",
+            "languages": [
+              "lv_LV"
+            ]
+          },
+          {
+            "name": "ml_IN-arjun-medium",
+            "languages": [
+              "ml_IN"
+            ]
+          },
+          {
+            "name": "ml_IN-meera-medium",
+            "languages": [
+              "ml_IN"
+            ]
+          },
+          {
+            "name": "ne_NP-chitwan-medium",
+            "languages": [
+              "ne_NP"
+            ]
+          },
+          {
+            "name": "ne_NP-google-medium",
+            "languages": [
+              "ne_NP"
+            ]
+          },
+          {
+            "name": "ne_NP-google-x_low",
+            "languages": [
+              "ne_NP"
+            ]
+          },
+          {
+            "name": "nl_BE-nathalie-medium",
+            "languages": [
+              "nl_BE"
+            ]
+          },
+          {
+            "name": "nl_BE-nathalie-x_low",
+            "languages": [
+              "nl_BE"
+            ]
+          },
+          {
+            "name": "nl_BE-rdh-medium",
+            "languages": [
+              "nl_BE"
+            ]
+          },
+          {
+            "name": "nl_BE-rdh-x_low",
+            "languages": [
+              "nl_BE"
+            ]
+          },
+          {
+            "name": "nl_NL-mls-medium",
+            "languages": [
+              "nl_NL"
+            ]
+          },
+          {
+            "name": "nl_NL-mls_5809-low",
+            "languages": [
+              "nl_NL"
+            ]
+          },
+          {
+            "name": "nl_NL-mls_7432-low",
+            "languages": [
+              "nl_NL"
+            ]
+          },
+          {
+            "name": "nl_NL-pim-medium",
+            "languages": [
+              "nl_NL"
+            ]
+          },
+          {
+            "name": "nl_NL-ronnie-medium",
+            "languages": [
+              "nl_NL"
+            ]
+          },
+          {
+            "name": "no_NO-nvcc-medium",
+            "languages": [
+              "no_NO"
+            ]
+          },
+          {
+            "name": "no_NO-talesyntese-medium",
+            "languages": [
+              "no_NO"
+            ]
+          },
+          {
+            "name": "pl_PL-darkman-medium",
+            "languages": [
+              "pl_PL"
+            ]
+          },
+          {
+            "name": "pl_PL-gosia-medium",
+            "languages": [
+              "pl_PL"
+            ]
+          },
+          {
+            "name": "pl_PL-mc_speech-medium",
+            "languages": [
+              "pl_PL"
+            ]
+          },
+          {
+            "name": "pl_PL-mls_6892-low",
+            "languages": [
+              "pl_PL"
+            ]
+          },
+          {
+            "name": "pt_BR-cadu-medium",
+            "languages": [
+              "pt_BR"
+            ]
+          },
+          {
+            "name": "pt_BR-edresson-low",
+            "languages": [
+              "pt_BR"
+            ]
+          },
+          {
+            "name": "pt_BR-faber-medium",
+            "languages": [
+              "pt_BR"
+            ]
+          },
+          {
+            "name": "pt_BR-jeff-medium",
+            "languages": [
+              "pt_BR"
+            ]
+          },
+          {
+            "name": "pt_PT-tug\u00e3o-medium",
+            "languages": [
+              "pt_PT"
+            ]
+          },
+          {
+            "name": "ro_RO-mihai-medium",
+            "languages": [
+              "ro_RO"
+            ]
+          },
+          {
+            "name": "ru_RU-denis-medium",
+            "languages": [
+              "ru_RU"
+            ]
+          },
+          {
+            "name": "ru_RU-dmitri-medium",
+            "languages": [
+              "ru_RU"
+            ]
+          },
+          {
+            "name": "ru_RU-irina-medium",
+            "languages": [
+              "ru_RU"
+            ]
+          },
+          {
+            "name": "ru_RU-ruslan-medium",
+            "languages": [
+              "ru_RU"
+            ]
+          },
+          {
+            "name": "sk_SK-lili-medium",
+            "languages": [
+              "sk_SK"
+            ]
+          },
+          {
+            "name": "sl_SI-artur-medium",
+            "languages": [
+              "sl_SI"
+            ]
+          },
+          {
+            "name": "sr_RS-serbski_institut-medium",
+            "languages": [
+              "sr_RS"
+            ]
+          },
+          {
+            "name": "sv_SE-lisa-medium",
+            "languages": [
+              "sv_SE"
+            ]
+          },
+          {
+            "name": "sv_SE-nst-medium",
+            "languages": [
+              "sv_SE"
+            ]
+          },
+          {
+            "name": "sw_CD-lanfrica-medium",
+            "languages": [
+              "sw_CD"
+            ]
+          },
+          {
+            "name": "te_IN-maya-medium",
+            "languages": [
+              "te_IN"
+            ]
+          },
+          {
+            "name": "te_IN-padmavathi-medium",
+            "languages": [
+              "te_IN"
+            ]
+          },
+          {
+            "name": "te_IN-venkatesh-medium",
+            "languages": [
+              "te_IN"
+            ]
+          },
+          {
+            "name": "tr_TR-dfki-medium",
+            "languages": [
+              "tr_TR"
+            ]
+          },
+          {
+            "name": "uk_UA-lada-x_low",
+            "languages": [
+              "uk_UA"
+            ]
+          },
+          {
+            "name": "uk_UA-ukrainian_tts-medium",
+            "languages": [
+              "uk_UA"
+            ]
+          },
+          {
+            "name": "vi_VN-25hours_single-low",
+            "languages": [
+              "vi_VN"
+            ]
+          },
+          {
+            "name": "vi_VN-vais1000-medium",
+            "languages": [
+              "vi_VN"
+            ]
+          },
+          {
+            "name": "vi_VN-vivos-x_low",
+            "languages": [
+              "vi_VN"
+            ]
+          },
+          {
+            "name": "zh_CN-chaowen-medium",
+            "languages": [
+              "zh_CN"
+            ]
+          },
+          {
+            "name": "zh_CN-huayan-medium",
+            "languages": [
+              "zh_CN"
+            ]
+          },
+          {
+            "name": "zh_CN-huayan-x_low",
+            "languages": [
+              "zh_CN"
+            ]
+          },
+          {
+            "name": "zh_CN-xiao_ya-medium",
+            "languages": [
+              "zh_CN"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hostname": "mmm4-ollama",
+      "description": "Ollama in Mac mini M4 24GB",
+      "endpoint": "192.168.10.3:11434",
+      "provider": "ollama",
+      "reachable": true,
+      "latency_ms": 10,
+      "error": null,
+      "ollama": {
+        "version": "0.31.1",
+        "loaded": [
+          {
+            "name": "mxbai-embed-large:latest",
+            "size": 685548502,
+            "size_vram": 685548502,
+            "gpu_fraction": 1.0,
+            "expires_at": "2026-07-05T08:12:02.019511-04:00",
+            "ttl_seconds": 86397,
+            "parameter_size": "334M",
+            "quantization": "F16"
+          }
+        ],
+        "downloaded": [
+          {
+            "name": "gemma4:12b-mlx",
+            "parameter_size": null,
+            "quantization": null,
+            "family": null,
+            "size": 9977519169
+          },
+          {
+            "name": "gemma4:e4b-mlx",
+            "parameter_size": null,
+            "quantization": "nvfp4",
+            "family": null,
+            "size": 9639236355
+          },
+          {
+            "name": "gemma4:e2b-mlx",
+            "parameter_size": null,
+            "quantization": "nvfp4",
+            "family": null,
+            "size": 7069822916
+          },
+          {
+            "name": "llama3.1:8b-instruct-q8_0",
+            "parameter_size": "8.0B",
+            "quantization": "Q8_0",
+            "family": "llama",
+            "size": 8540789934
+          },
+          {
+            "name": "llama3.1:8b",
+            "parameter_size": "8.0B",
+            "quantization": "Q4_K_M",
+            "family": "llama",
+            "size": 4920753328
+          },
+          {
+            "name": "allenporter/assist-llm:latest",
+            "parameter_size": "8.0B",
+            "quantization": "Q4_K_M",
+            "family": "llama",
+            "size": 4920753348
+          },
+          {
+            "name": "mxbai-embed-large:latest",
+            "parameter_size": "334M",
+            "quantization": "F16",
+            "family": "bert",
+            "size": 669615493
+          },
+          {
+            "name": "qwen2.5:3b-instruct",
+            "parameter_size": "3.1B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 1929912432
+          },
+          {
+            "name": "qwen3:4b-instruct",
+            "parameter_size": "4.0B",
+            "quantization": "Q4_K_M",
+            "family": "qwen3",
+            "size": 2497293803
+          },
+          {
+            "name": "gpt-oss:20b",
+            "parameter_size": "20.9B",
+            "quantization": "MXFP4",
+            "family": "gptoss",
+            "size": 13793441244
+          },
+          {
+            "name": "qwen2.5:7b-instruct",
+            "parameter_size": "7.6B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 4683087332
+          }
+        ]
+      },
+      "whisper": null,
+      "piper": null
+    },
+    {
+      "hostname": "macstudio-ollama",
+      "description": "Ollama in Mac Studio M1 Ultra 64GB",
+      "endpoint": "192.168.10.5:11434",
+      "provider": "ollama",
+      "reachable": true,
+      "latency_ms": 12,
+      "error": null,
+      "ollama": {
+        "version": "0.31.1",
+        "loaded": [
+          {
+            "name": "Qwen3.6:35B-A3B",
+            "size": 29804315277,
+            "size_vram": 29804315277,
+            "gpu_fraction": 1.0,
+            "expires_at": "2026-07-04T09:09:08.610124-04:00",
+            "ttl_seconds": 3424,
+            "parameter_size": "36.0B",
+            "quantization": "Q4_K_M"
+          },
+          {
+            "name": "qwen2.5-coder:14b",
+            "size": 15265588837,
+            "size_vram": 15265588837,
+            "gpu_fraction": 1.0,
+            "expires_at": "2026-07-04T09:00:06.493696-04:00",
+            "ttl_seconds": 2882,
+            "parameter_size": "14.8B",
+            "quantization": "Q4_K_M"
+          }
+        ],
+        "downloaded": [
+          {
+            "name": "gemma4:e4b-mlx",
+            "parameter_size": null,
+            "quantization": "nvfp4",
+            "family": null,
+            "size": 9639236355
+          },
+          {
+            "name": "gemma4:31b-mlx",
+            "parameter_size": null,
+            "quantization": "nvfp4",
+            "family": null,
+            "size": 20234756907
+          },
+          {
+            "name": "gemma4:26b-mlx",
+            "parameter_size": null,
+            "quantization": "nvfp4",
+            "family": null,
+            "size": 16679502421
+          },
+          {
+            "name": "gemma4:12b-mlx",
+            "parameter_size": null,
+            "quantization": null,
+            "family": null,
+            "size": 9977519169
+          },
+          {
+            "name": "qwen2.5:3b-instruct",
+            "parameter_size": "3.1B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 1929912432
+          },
+          {
+            "name": "qwen2.5-coder:14b",
+            "parameter_size": "14.8B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 8988124298
+          },
+          {
+            "name": "qwen2.5-coder:7b",
+            "parameter_size": "7.6B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 4683087561
+          },
+          {
+            "name": "nemotron-3-nano:30b",
+            "parameter_size": "31.6B",
+            "quantization": "Q4_K_M",
+            "family": "nemotron_h_moe",
+            "size": 24271934866
+          },
+          {
+            "name": "nemotron-3-nano:4b",
+            "parameter_size": "4.0B",
+            "quantization": "Q4_K_M",
+            "family": "nemotron_h",
+            "size": 2837597147
+          },
+          {
+            "name": "pepa-ha:latest",
+            "parameter_size": "7.6B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 4683089205
+          },
+          {
+            "name": "Qwen3.6:35B-A3B",
+            "parameter_size": "36.0B",
+            "quantization": "Q4_K_M",
+            "family": "qwen35moe",
+            "size": 23938333577
+          },
+          {
+            "name": "legraphista/Orpheus:latest",
+            "parameter_size": "3.8B",
+            "quantization": "Q4_K_M",
+            "family": "llama",
+            "size": 2363761196
+          },
+          {
+            "name": "dengcao/Qwen3-Reranker-4B:Q5_K_M",
+            "parameter_size": "4.0B",
+            "quantization": "Q5_K_M",
+            "family": "qwen3",
+            "size": 2888947369
+          },
+          {
+            "name": "dcarrascosa/medgemma-1.5-4b-it:F16",
+            "parameter_size": "4.3B",
+            "quantization": "F16",
+            "family": "gemma3",
+            "size": 8617515060
+          },
+          {
+            "name": "dcarrascosa/medgemma-1.5-4b-it:Q4_K_M",
+            "parameter_size": "4.3B",
+            "quantization": "Q4_K_M",
+            "family": "gemma3",
+            "size": 3338929527
+          },
+          {
+            "name": "karanchopda333/whisper:latest",
+            "parameter_size": "3.2B",
+            "quantization": "Q4_K_M",
+            "family": "llama",
+            "size": 2019393369
+          },
+          {
+            "name": "nomic-embed-text:latest",
+            "parameter_size": "137M",
+            "quantization": "F16",
+            "family": "nomic-bert",
+            "size": 274302450
+          },
+          {
+            "name": "qwen3.5:35b-a3b-coding-nvfp4",
+            "parameter_size": null,
+            "quantization": "nvfp4",
+            "family": null,
+            "size": 21909194238
+          },
+          {
+            "name": "qwen2.5-coder:32b",
+            "parameter_size": "32.8B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 19851349898
+          },
+          {
+            "name": "qwen3-coder:30b",
+            "parameter_size": "30.5B",
+            "quantization": "Q4_K_M",
+            "family": "qwen3moe",
+            "size": 18556700761
+          },
+          {
+            "name": "qwen2.5:7b-instruct",
+            "parameter_size": "7.6B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 4683087332
+          },
+          {
+            "name": "llama3:8b",
+            "parameter_size": "8.0B",
+            "quantization": "Q4_0",
+            "family": "llama",
+            "size": 4661224676
+          },
+          {
+            "name": "qwen2.5:14b",
+            "parameter_size": "14.8B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 8988124069
+          },
+          {
+            "name": "gemma3:12b",
+            "parameter_size": "12.2B",
+            "quantization": "Q4_K_M",
+            "family": "gemma3",
+            "size": 8149190253
+          },
+          {
+            "name": "mxbai-embed-large:latest",
+            "parameter_size": "334M",
+            "quantization": "F16",
+            "family": "bert",
+            "size": 669615493
+          },
+          {
+            "name": "allenporter/assist-llm:latest",
+            "parameter_size": "8.0B",
+            "quantization": "Q4_K_M",
+            "family": "llama",
+            "size": 4920753348
+          },
+          {
+            "name": "qwen3.5:9b",
+            "parameter_size": "9.7B",
+            "quantization": "Q4_K_M",
+            "family": "qwen35",
+            "size": 6594474711
+          },
+          {
+            "name": "qwen2.5:7b",
+            "parameter_size": "7.6B",
+            "quantization": "Q4_K_M",
+            "family": "qwen2",
+            "size": 4683087332
+          },
+          {
+            "name": "gpt-oss:20b",
+            "parameter_size": "20.9B",
+            "quantization": "MXFP4",
+            "family": "gptoss",
+            "size": 13793441244
+          }
+        ]
+      },
+      "whisper": null,
+      "piper": null
+    },
+    {
+      "hostname": "pepews4-ollama",
+      "description": "Ollama in Dell G7 7700 i7-10750 32GB RTX2070 Super 8GB VRAM",
+      "endpoint": "192.168.10.2:11434",
+      "provider": "ollama",
+      "reachable": false,
+      "latency_ms": null,
+      "error": {
+        "kind": "timeout",
+        "detail": "<urlopen error timed out>"
+      },
+      "ollama": null,
+      "whisper": null,
+      "piper": null
+    }
+  ]
+}

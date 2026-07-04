@@ -33,14 +33,14 @@ git clone https://github.com/<your-user>/llm-fleet-monitor.git
 cd llm-fleet-monitor
 
 # 1. Create your host list (see "The host list" below)
-cp example.llm-fleet.csv llm-fleet.csv
+cp llm-fleet.csv llm-fleet.csv
 $EDITOR llm-fleet.csv
 
 # 2. Run the probe — one-shot readable report
-python llm-fleet-monitor.py llm-fleet.csv
+python3 llm-fleet-monitor.py llm-fleet.csv
 
 # 3. (Optional) Run the live web dashboard
-python gui.py
+python3 gui.py
 # then open http://127.0.0.1:8766
 ```
 
@@ -78,7 +78,7 @@ Rules:
 ## Usage — the probe (CLI)
 
 ```
-python llm-fleet-monitor.py HOSTS_CSV [--timeout SECONDS] [--json] [--verbose] [--fail-on-unreachable]
+python3 llm-fleet-monitor.py HOSTS_CSV [--timeout SECONDS] [--json] [--verbose] [--fail-on-unreachable]
 ```
 
 | Flag                     | Effect                                                                                  |
@@ -129,7 +129,7 @@ voice-stt — Whisper speech-to-text
 ## Usage — the web dashboard (optional)
 
 ```
-python gui.py [--fixture] [--csv PATH] [--port N]
+python3 gui.py [--fixture] [--csv PATH] [--port N]
 ```
 
 | Flag           | Effect                                                                          |
