@@ -311,6 +311,7 @@ def probe_wyoming(host: str, port: int, timeout: float, kind: str) -> Tuple[bool
 
 @dataclass
 class Row:
+    sort: int
     hostname: str
     description: str
     endpoint: str
@@ -323,15 +324,25 @@ def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
     try:
         with open(csv_path, newline='', encoding='utf-8') as f:
             rdr = csv.DictReader(f)
-            required = ["hostname", "description", "endpoint", "ollama", "whisper", "piper"]
+            required = ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper"]
             missing = [c for c in required if c not in (rdr.fieldnames or [])]
             if missing:
                 raise ValueError(f"CSV missing required column(s): {', '.join(missing)}")
             for i, r in enumerate(rdr, start=2):  # 1-based with header, so first row is line 2
                 try:
                     hostname = (r.get("hostname") or "").strip()
-                    description = (r.get("description") or "").strip()
                     endpoint = (r.get("endpoint") or "").strip()
+                    # Parse sort after hostname is available for better warnings
+                    sort_raw = r.get("sort")
+                    try:
+                        sort = int((sort_raw or "").strip())
+                    except ValueError:
+                        warnings.append(
+                            f"line {i} ({hostname or 'unknown'}): bad sort value '{sort_raw}' — skipping"
+                        )
+                        continue
+                    hostname = (r.get("hostname") or "").strip()
+                    description = (r.get("description") or "").strip()
                     if not hostname or not endpoint:
                         warnings.append(f"line {i}: missing hostname or endpoint — skipping")
                         continue
@@ -352,7 +363,7 @@ def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
                     except Exception as e:
                         warnings.append(f"line {i} ({hostname}): bad endpoint '{endpoint}': {e} — skipping")
                         continue
-                    rows.append(Row(hostname=hostname, description=description, endpoint=endpoint, provider=provider))
+                    rows.append(Row(sort=sort, hostname=hostname, description=description, endpoint=endpoint, provider=provider))
                 except Exception as e:
                     warnings.append(f"line {i}: error parsing row: {e} — skipping")
     except FileNotFoundError:
@@ -365,6 +376,7 @@ def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
 def build_record(row: Row, timeout: float) -> Dict[str, Any]:
     host, port = parse_host_port(row.endpoint)
     base: Dict[str, Any] = {
+        "sort": row.sort,
         "hostname": row.hostname,
         "description": row.description,
         "endpoint": row.endpoint,
@@ -406,6 +418,7 @@ def run_probe(rows: List[Row], timeout: float, max_workers: int = 16) -> Dict[st
                 # but guard anyway.
                 r = fut_map[fut]
                 rec = {
+                    "sort": r.sort,
                     "hostname": r.hostname,
                     "description": r.description,
                     "endpoint": r.endpoint,
@@ -418,8 +431,10 @@ def run_probe(rows: List[Row], timeout: float, max_workers: int = 16) -> Dict[st
                     "piper": None,
                 }
             results.append(rec)
+    # Sort results deterministically by (sort, str(sort)+hostname)
+    results.sort(key=lambda rec: (rec.get("sort", 0), f"{rec.get('sort', 0)}{rec.get('hostname') or ''}"))
     # Phase 2A: add stable top-level schema version for machine-consumable output
-    return {"schema_version": 1, "probed_at": probed_at, "results": results}
+    return {"schema_version": 2, "probed_at": probed_at, "results": results}
 
 
 # ------------------------- Importable API -------------------------
@@ -570,9 +585,9 @@ def render_text(envelope: Dict[str, Any], *, verbose: bool = False) -> str:
 
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="llm_fleet_monitor.py", description="Probe a fleet of LLM/voice endpoints and report status.")
-    p.add_argument("hosts_csv", help="Path to hosts CSV with columns: hostname,description,endpoint,ollama,whisper,piper")
+    p.add_argument("hosts_csv", help="Path to hosts CSV with columns: sort,hostname,description,endpoint,ollama,whisper,piper")
     p.add_argument("--timeout", type=float, default=3.0, help="Per-endpoint connect+read timeout in seconds (default 3.0)")
-    p.add_argument("--json", dest="as_json", action="store_true", help="Emit the JSON envelope (schema_version=1) to stdout; silently ignores --verbose")
+    p.add_argument("--json", dest="as_json", action="store_true", help="Emit the JSON envelope (schema_version=2) to stdout; silently ignores --verbose")
     p.add_argument("--verbose", action="store_true", help="Text view only: show full Whisper/Piper details; ignored with --json")
     p.add_argument("--fail-on-unreachable", action="store_true", help="Exit 1 if any endpoint is unreachable")
 

@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "probed_at": "2026-07-04T08:12:04-04:00",
   "results": [
     {
+      "sort": 20,
       "hostname": "mmm4-whisper",
       "description": "Wyoming whisper-large-v3 STT in Mac mini M4",
       "endpoint": "192.168.10.3:10300",
@@ -124,6 +125,7 @@
       "piper": null
     },
     {
+      "sort": 30,
       "hostname": "mmm4-piper",
       "description": "Wyoming piper TTS in Mac mini M4",
       "endpoint": "192.168.10.3:10200",
@@ -1041,6 +1043,7 @@
       }
     },
     {
+      "sort": 10,
       "hostname": "mmm4-ollama",
       "description": "Ollama in Mac mini M4 24GB",
       "endpoint": "192.168.10.3:11434",
@@ -1146,6 +1149,7 @@
       "piper": null
     },
     {
+      "sort": 50,
       "hostname": "macstudio-ollama",
       "description": "Ollama in Mac Studio M1 Ultra 64GB",
       "endpoint": "192.168.10.5:11434",
@@ -1387,6 +1391,7 @@
       "piper": null
     },
     {
+      "sort": 40,
       "hostname": "pepews4-ollama",
       "description": "Ollama in Dell G7 7700 i7-10750 32GB RTX2070 Super 8GB VRAM",
       "endpoint": "192.168.10.2:11434",

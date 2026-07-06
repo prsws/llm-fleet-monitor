@@ -63,7 +63,7 @@ class TestLlmFleetMonitorUtilities(unittest.TestCase):
 
 class TestLlmFleetMonitorCsv(unittest.TestCase):
     def write_csv(self, rows, fieldnames=None):
-        fieldnames = fieldnames or ["hostname", "description", "endpoint", "ollama", "whisper", "piper"]
+        fieldnames = fieldnames or ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper"]
         tmp = tempfile.NamedTemporaryFile("w", newline="", encoding="utf-8", delete=False)
         with tmp:
             writer = csv.DictWriter(tmp, fieldnames=fieldnames)
@@ -75,6 +75,7 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
         path = self.write_csv(
             [
                 {
+                    "sort": "10",
                     "hostname": "host1",
                     "description": "Ollama host",
                     "endpoint": "127.0.0.1:11434",
@@ -91,11 +92,13 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].hostname, "host1")
         self.assertEqual(rows[0].provider, "ollama")
+        self.assertEqual(rows[0].sort, 10)
 
     def test_read_rows_skips_rows_with_multiple_provider_flags(self):
         path = self.write_csv(
             [
                 {
+                    "sort": "10",
                     "hostname": "bad",
                     "description": "Invalid",
                     "endpoint": "127.0.0.1:1234",
@@ -116,6 +119,7 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
         path = self.write_csv(
             [
                 {
+                    "sort": "10",
                     "hostname": "bad",
                     "description": "Invalid",
                     "endpoint": "127.0.0.1",
@@ -132,14 +136,75 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertIn("bad endpoint", warnings[0])
 
+    def test_read_rows_parses_sort_field(self):
+        path = self.write_csv(
+            [
+                {
+                    "sort": "42",
+                    "hostname": "ok",
+                    "description": "Has sort",
+                    "endpoint": "127.0.0.1:11434",
+                    "ollama": "true",
+                    "whisper": "false",
+                    "piper": "false",
+                }
+            ]
+        )
+
+        rows, warnings = monitor.read_rows(path)
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].sort, 42)
+
+    def test_read_rows_skips_row_with_non_integer_sort(self):
+        path = self.write_csv(
+            [
+                {
+                    "sort": "banana",
+                    "hostname": "bad",
+                    "description": "Invalid sort",
+                    "endpoint": "127.0.0.1:11434",
+                    "ollama": "true",
+                    "whisper": "false",
+                    "piper": "false",
+                }
+            ]
+        )
+
+        rows, warnings = monitor.read_rows(path)
+        self.assertEqual(rows, [])
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("bad sort value", warnings[0])
+
+    def test_read_rows_rejects_missing_sort_column(self):
+        # old header without sort
+        path = self.write_csv(
+            [
+                {
+                    "hostname": "ok",
+                    "description": "Missing sort column",
+                    "endpoint": "127.0.0.1:11434",
+                    "ollama": "true",
+                    "whisper": "false",
+                    "piper": "false",
+                }
+            ],
+            fieldnames=["hostname", "description", "endpoint", "ollama", "whisper", "piper"],
+        )
+
+        with self.assertRaises(ValueError) as cm:
+            monitor.read_rows(path)
+        self.assertIn("sort", str(cm.exception))
+
 
 class TestLlmFleetMonitorRendering(unittest.TestCase):
     def test_render_text_for_unreachable_host(self):
         envelope = {
-            "schema_version": 1,
+            "schema_version": 2,
             "probed_at": "now",
             "results": [
                 {
+                    "sort": 10,
                     "hostname": "host1",
                     "description": "Test host",
                     "endpoint": "127.0.0.1:11434",
@@ -160,8 +225,8 @@ class TestLlmFleetMonitorRendering(unittest.TestCase):
         self.assertIn("reachable  NO — timeout — timed out", text)
 
     def test_probe_fleet_uses_read_rows_and_run_probe(self):
-        fake_rows = [monitor.Row("h", "d", "127.0.0.1:1", "ollama")]
-        fake_envelope = {"schema_version": 1, "probed_at": "x", "results": []}
+        fake_rows = [monitor.Row(10, "h", "d", "127.0.0.1:1", "ollama")]
+        fake_envelope = {"schema_version": 2, "probed_at": "x", "results": []}
 
         with patch.object(monitor, "read_rows", return_value=(fake_rows, [])) as read_rows:
             with patch.object(monitor, "run_probe", return_value=fake_envelope) as run_probe:
@@ -170,6 +235,48 @@ class TestLlmFleetMonitorRendering(unittest.TestCase):
         self.assertEqual(result, fake_envelope)
         read_rows.assert_called_once_with("fleet.csv")
         run_probe.assert_called_once_with(fake_rows, timeout=1.5, max_workers=2)
+
+
+class TestLlmFleetMonitorSorting(unittest.TestCase):
+    def test_run_probe_sorts_results_by_sort_field(self):
+        rows = [
+            monitor.Row(30, "c", "d3", "127.0.0.1:3", "ollama"),
+            monitor.Row(10, "a", "d1", "127.0.0.1:1", "ollama"),
+            monitor.Row(20, "b", "d2", "127.0.0.1:2", "ollama"),
+        ]
+
+        def fake_build_record(row, timeout):
+            return {"sort": row.sort, "hostname": row.hostname}
+
+        with patch.object(monitor, "build_record", side_effect=fake_build_record):
+            env = monitor.run_probe(rows, timeout=1.0)
+
+        self.assertEqual([r["sort"] for r in env["results"]], [10, 20, 30])
+
+    def test_run_probe_breaks_sort_ties_by_sort_plus_hostname(self):
+        rows = [
+            monitor.Row(10, "zzz", "d", "127.0.0.1:1", "ollama"),
+            monitor.Row(10, "aaa", "d", "127.0.0.1:1", "ollama"),
+        ]
+
+        def fake_build_record(row, timeout):
+            return {"sort": row.sort, "hostname": row.hostname}
+
+        with patch.object(monitor, "build_record", side_effect=fake_build_record):
+            env = monitor.run_probe(rows, timeout=1.0)
+
+        self.assertEqual([r["hostname"] for r in env["results"]], ["aaa", "zzz"])
+
+    def test_run_probe_schema_version_is_2(self):
+        rows = [monitor.Row(10, "a", "d", "127.0.0.1:1", "ollama")]
+
+        def fake_build_record(row, timeout):
+            return {"sort": row.sort, "hostname": row.hostname}
+
+        with patch.object(monitor, "build_record", side_effect=fake_build_record):
+            env = monitor.run_probe(rows, timeout=1.0)
+
+        self.assertEqual(env["schema_version"], 2)
 
 
 if __name__ == "__main__":

@@ -70,7 +70,7 @@ def import_probe_module(path: Path):
 # ------------------------- Cache -------------------------
 
 _cache_lock = threading.RLock()
-_cached_envelope: Dict[str, Any] = {"schema_version": 1, "probed_at": None, "results": []}
+_cached_envelope: Dict[str, Any] = {"schema_version": 2, "probed_at": None, "results": []}
 
 
 def set_envelope(env: Dict[str, Any]) -> None:
@@ -399,7 +399,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 env = json.load(f)
         except FileNotFoundError:
             # Graceful fallback if sample.json is absent
-            env = {"schema_version": 1, "probed_at": None, "results": []}
+            env = {"schema_version": 2, "probed_at": None, "results": []}
         set_envelope(env)
         mod = None
     else:
@@ -420,7 +420,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         except Exception as e:
             # Don't crash the server on initial failure; show zero-state page
             sys.stderr.write(f"initial probe failed: {e}\n")
-            set_envelope({"schema_version": 1, "probed_at": None, "results": []})
+            set_envelope({"schema_version": 2, "probed_at": None, "results": []})
 
     # Start background refresher if not in fixture mode
     stop_evt = threading.Event()
