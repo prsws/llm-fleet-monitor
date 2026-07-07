@@ -1,0 +1,43 @@
+#host-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pico-spacing);
+  align-items: flex-start;
+}
+
+#host-cards > article {
+  flex: 1 1 22rem;
+  max-width: 32rem;
+}
+
+/* Host card header with two-line layout */
+#host-cards > article > header.host-card-header {
+  display: block;
+  line-height: 1.2;
+  margin-bottom: var(--pico-spacing);
+}
+
+#host-cards .host-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+#host-cards .host-desc {
+  color: var(--pico-muted-color, var(--pico-color));
+  font-size: 0.9rem;
+  opacity: 0.78;
+  margin-top: 0.125rem;
+}
+
+/* Downloaded models list (Ollama) */
+.downloaded-models {
+  margin-top: var(--pico-spacing);
+}
+
+.downloaded-models li {
+  margin-bottom: calc(var(--pico-spacing) * 0.5);
+}
+
+.downloaded-models small {
+  display: block;
+}

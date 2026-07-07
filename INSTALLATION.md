@@ -71,6 +71,7 @@ cd /opt/llm-fleet-monitor
 
 ## 7. Configure the Host List
 The monitor reads a CSV file with one row per service endpoint. A single row must select exactly one service type: Ollama, Whisper, or Piper.
+The sort column must not be empty and in case of collisions the gui adds the hostname to disambiguate.
 ```
 cd /opt/llm-fleet-monitor
 cp example.llm-fleet.csv llm-fleet.csv
@@ -80,11 +81,11 @@ nano llm-fleet.csv
 ```
 Example CSV:
 
-|hostname	|description	|endpoint	|ollama	|whisper	| piper |
-|---|---|---|---|---|---|
-|gpu-box	|Main Ollama box	|<your-ip-here>:11434	|true	|false	| false |
-|voice-stt	|Whisper speech-to-text	|<your-ip-here>:10300	|false	|true	| false |
-|voice-tts	|Piper text-to-speech	|<your-ip-here>:10200	|false	|false	| true |
+| sort          | hostname	   |description	|endpoint	|ollama	|whisper	| piper |
+|---------------|-------------|---|---|---|---|---|
+| 10            | gpu-box	    | Main Ollama box	        |<your-ip-here>:11434	|true	|false	| false |
+| 20            | voice-stt	  | Whisper speech-to-text	 |<your-ip-here>:10300	|false	|true	| false |
+| 30|  voice-tts	 | Piper text-to-speech	 |<your-ip-here>:10200	|false	|false	| true |
 
 Keep the real CSV private. It contains internal hostnames, IP addresses, ports, and service roles. Add llm-fleet.csv to .gitignore and commit only sanitized examples.
 
