@@ -148,8 +148,13 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
             err = rec.get("error") or None
 
             parts.append("<article>")
-            # Header
-            parts.append(f"<header><strong>{html_escape(hostname)}</strong> — {html_escape(description)}</header>")
+            # Header (split hostname and description into two lines within header)
+            parts.append(
+                "<header class=\"host-card-header\">"
+                f"<div class=\"host-title\"><strong>{html_escape(hostname)}</strong></div>"
+                f"<div class=\"host-desc\">{html_escape(description)}</div>"
+                "</header>"
+            )
             # Endpoint
             tag_txt = {"ollama": "ollama", "whisper": "whisper/wyoming", "piper": "piper/wyoming"}.get(provider, provider)
             parts.append(f"<small><code>{html_escape(endpoint)}</code> [{html_escape(tag_txt)}]</small>")
@@ -195,17 +200,31 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
 
                 inv = o.get("downloaded") or []
                 parts.append(f"<p>Downloaded (ls): {len(inv)} model{'s' if len(inv)!=1 else ''}</p>")
+                # Render a Pico.css-compatible accordion for downloaded models (if any)
                 if inv:
-                    names: List[str] = []
+                    parts.append("<details><summary>Downloaded models</summary><ul class=\"downloaded-models\">")
                     for m in inv:
                         nm = html_escape(str(m.get("name") or "?"))
-                        ps = (m.get("parameter_size") or "").strip() if isinstance(m.get("parameter_size"), str) else m.get("parameter_size")
-                        q = (m.get("quantization") or "").strip() if isinstance(m.get("quantization"), str) else m.get("quantization")
-                        fam = (m.get("family") or "").strip() if isinstance(m.get("family"), str) else m.get("family")
-                        suffix_parts = [html_escape(p) for p in [ps, q, fam] if isinstance(p, str) and p]
-                        suffix = f" ({' '.join(suffix_parts)})" if suffix_parts else ""
-                        names.append(f"{nm}{suffix}")
-                    parts.append(f"<p style=\"max-width: 80ch;\">{', '.join(names)}</p>")
+
+                        # Collect metadata parts in order: parameter_size, quantization, family
+                        metadata_parts: List[str] = []
+                        for value in (
+                            m.get("parameter_size"),
+                            m.get("quantization"),
+                            m.get("family"),
+                        ):
+                            if isinstance(value, str):
+                                v = value.strip()
+                                if v:
+                                    metadata_parts.append(html_escape(v))
+
+                        if metadata_parts:
+                            metadata = " · ".join(metadata_parts)
+                            parts.append(f"<li><code>{nm}</code><small>{metadata}</small></li>")
+                        else:
+                            parts.append(f"<li><code>{nm}</code></li>")
+
+                    parts.append("</ul></details>")
 
             elif provider == "whisper" and rec.get("whisper"):
                 w = rec["whisper"] or {}
@@ -262,6 +281,7 @@ def render_full_page(env: Dict[str, Any]) -> str:
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
     <title>LLM Fleet Monitor</title>
     <link rel=\"stylesheet\" href=\"{pico_css}\">
+    <link rel=\"stylesheet\" href=\"/style.css\">
 <!--
 COMMENTED OUT ON PURPOSE BY JOSE 20260630 - replace htmx4 cdn with local downloaded htmax.js - DO NOT MODIFY
     <script src=\"{htmx_src}\" integrity=\"{htmx_sri}\" crossorigin=\"anonymous\"></script>
@@ -321,6 +341,14 @@ class Handler(BaseHTTPRequestHandler):
                 body = (HERE / "htmax.js").read_bytes()
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "application/javascript; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            elif self.path == "/style.css":
+                body = (HERE / "style.css").read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/css; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
