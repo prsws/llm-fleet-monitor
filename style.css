@@ -29,17 +29,25 @@
   margin-top: 0.125rem;
 }
 
-/* Downloaded models list (Ollama) */
-.downloaded-models {
-  margin-top: var(--pico-spacing);
+/* Compact tables for per-model attributes (Pico classless tables) */
+.model-table {
+  margin-bottom: calc(var(--pico-spacing) * .75);
+  font-size: .875rem;
 }
 
-.downloaded-models li {
-  margin-bottom: calc(var(--pico-spacing) * 0.5);
+.model-table th, .model-table td {
+  padding: calc(var(--pico-spacing) * .25) calc(var(--pico-spacing) * .5);
 }
 
-.downloaded-models small {
-  display: block;
+.model-table td:first-child {
+  color: var(--pico-muted-color, currentColor);
+  white-space: nowrap;
+  width: 1%;
+}
+
+/* Compact status table at top of each card; shares model-table styling */
+.status-table {
+  margin-bottom: var(--pico-spacing);
 }
 
 /* --- Scan indicator (htmx lifecycle) --- */

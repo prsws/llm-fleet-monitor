@@ -250,25 +250,31 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 f"<div class=\"host-desc\">{html_escape(description)}</div>"
                 "</header>"
             )
-            # Endpoint
+            # Endpoint + Reachability as a compact 2-column table (no <mark>, shared style with model tables)
             tag_txt = {"ollama": "ollama", "whisper": "whisper/wyoming", "piper": "piper/wyoming"}.get(provider, provider)
-            parts.append(f"<small><code>{html_escape(endpoint)}</code> [{html_escape(tag_txt)}]</small>")
-
-            # Reachability
+            # Build status cell content preserving existing wording except bold NO
             if reachable:
                 lat = f"{int(latency_ms)} ms" if isinstance(latency_ms, int) else "?"
-                parts.append(f"<p><mark>reachable</mark> yes ({lat})</p>")
+                status_html = f"yes ({lat})"
             else:
                 if err:
                     kind = html_escape(str(err.get("kind")))
                     detail = html_escape(str(err.get("detail") or ""))
                     dash = f" — {detail}" if detail else ""
-                    parts.append(f"<p><mark>reachable</mark> NO — {kind}{dash}</p>")
+                    status_html = f"<strong>NO</strong> — {kind}{dash}"
                 else:
-                    parts.append(f"<p><mark>reachable</mark> NO</p>")
+                    status_html = "<strong>NO</strong>"
 
-            # Provider-specific blocks
-            if provider == "ollama" and rec.get("ollama"):
+            parts.append(
+                "<table class=\"model-table status-table\">"
+                "<tbody>"
+                f"<tr><td><strong>Endpoint</strong></td><td><code>{html_escape(endpoint)}</code> [{html_escape(tag_txt)}]</td></tr>"
+                f"<tr><td>Reachable?</td><td>{status_html}</td></tr>"
+                "</tbody></table>"
+            )
+
+            # Provider-specific blocks (only when host is reachable)
+            if reachable and provider == "ollama" and rec.get("ollama"):
                 o = rec["ollama"] or {}
                 ver = (o.get("version") or "").strip()
                 if ver:
@@ -280,7 +286,8 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # Provide a stable id to allow Idiomorph to match elements across swaps.
                     # Per htmx 4 beta5 docs (see /docs.md under "Swapping" and Idiomorph),
                     # using the morph swap allows attribute-preserving matching by id.
-                    parts.append(f"<details id=\"ld-{slug}\" open><summary>Running (ps)</summary><ul>")
+                    parts.append(f"<hr />")
+                    parts.append(f"<details id=\"ld-{slug}\" open><summary><strong>Running models</strong> (ps): {len(loaded)}</summary>")
                     for m in loaded:
                         name = html_escape(str(m.get("name") or "?"))
                         size = human_size(m.get("size"))
@@ -291,11 +298,17 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         ttl = human_ttl(m.get("ttl_seconds")) if m.get("ttl_seconds") is not None else "?"
                         spill_note = " — <strong>SPILLED</strong>" if spilled else ""
                         parts.append(
-                            f"<li><code>{name}</code> {size} • VRAM {vram} ({gpu_pct} GPU){spill_note} • TTL {ttl}</li>"
+                            "<table class=\"model-table\">"
+                            f"<thead><tr><th colspan=\"2\"><code>{name}</code></th></tr></thead>"
+                            "<tbody>"
+                            f"<tr><td>Size</td><td>{size}</td></tr>"
+                            f"<tr><td>VRAM</td><td>{vram} ({gpu_pct} GPU){spill_note}</td></tr>"
+                            f"<tr><td>TTL</td><td>{ttl}</td></tr>"
+                            "</tbody></table>"
                         )
-                    parts.append("</ul></details>")
+                    parts.append("</details>")
                 else:
-                    parts.append("<p>Up, nothing running</p>")
+                    parts.append("<p><strong>Running models</strong> (ps): Up, but nothing running</p>")
 
                 inv = o.get("downloaded") or []
                 # Consolidate downloaded count into the accordion header. When empty, show a plain line.
@@ -305,33 +318,36 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # Per htmx 4 beta5 docs (/docs.md "Preserving Elements Across Swaps"),
                     # adding the `hx-preserve` attribute keeps the existing element instance.
                     parts.append(
-                        f"<details id=\"dl-{slug}\" hx-preserve><summary>Downloaded models (ls): {len(inv)}</summary><ul class=\"downloaded-models\">"
+                        f"<details id=\"dl-{slug}\" hx-preserve><summary><strong>Downloaded models</strong> (ls): {len(inv)}</summary>"
                     )
                     for m in inv:
                         nm = html_escape(str(m.get("name") or "?"))
+                        # Build rows conditionally; size is always present in downloaded entries
+                        rows: List[str] = []
+                        param = m.get("parameter_size")
+                        if isinstance(param, str) and param.strip():
+                            rows.append(f"<tr><td>Parameters</td><td>{html_escape(param.strip())}</td></tr>")
+                        quant = m.get("quantization")
+                        if isinstance(quant, str) and quant.strip():
+                            rows.append(f"<tr><td>Quantization</td><td>{html_escape(quant.strip())}</td></tr>")
+                        fam = m.get("family")
+                        if isinstance(fam, str) and fam.strip():
+                            rows.append(f"<tr><td>Family</td><td>{html_escape(fam.strip())}</td></tr>")
+                        size_h = human_size(m.get("size"))
+                        rows.append(f"<tr><td>Size</td><td>{size_h}</td></tr>")
 
-                        # Collect metadata parts in order: parameter_size, quantization, family
-                        metadata_parts: List[str] = []
-                        for value in (
-                            m.get("parameter_size"),
-                            m.get("quantization"),
-                            m.get("family"),
-                        ):
-                            if isinstance(value, str):
-                                v = value.strip()
-                                if v:
-                                    metadata_parts.append(html_escape(v))
-
-                        if metadata_parts:
-                            metadata = " · ".join(metadata_parts)
-                            parts.append(f"<li><code>{nm}</code><small>{metadata}</small></li>")
-                        else:
-                            parts.append(f"<li><code>{nm}</code></li>")
-                    parts.append("</ul></details>")
+                        parts.append(
+                            "<table class=\"model-table\">"
+                            f"<thead><tr><th colspan=\"2\"><code>{nm}</code></th></tr></thead>"
+                            "<tbody>"
+                            + "".join(rows) +
+                            "</tbody></table>"
+                        )
+                    parts.append("</details>")
                 else:
-                    parts.append("<p>Downloaded models (ls): 0</p>")
+                    parts.append("<p><strong>Downloaded models</strong> (ls): 0</p>")
 
-            elif provider == "whisper" and rec.get("whisper"):
+            elif reachable and provider == "whisper" and rec.get("whisper"):
                 w = rec["whisper"] or {}
                 prog = (w.get("program") or "").strip()
                 ver = (w.get("version") or "").strip()
@@ -344,7 +360,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         count_langs += len(m.get("languages") or [])
                     parts.append(f"<p>{len(models)} models across ~{count_langs} langs</p>")
 
-            elif provider == "piper" and rec.get("piper"):
+            elif reachable and provider == "piper" and rec.get("piper"):
                 p = rec["piper"] or {}
                 prog = (p.get("program") or "").strip()
                 ver = (p.get("version") or "").strip()
