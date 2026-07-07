@@ -17,7 +17,7 @@ Routes:
 Flags:
   --fixture            Serve HERE/sample.json instead of probing (dev fixture)
   --csv PATH           Override CSV (default HERE/llm-fleet.csv)
-  --port N             Override port (default 8765)
+  --port N             Override port (default 8766)
 
 Run:
   python gui.py --fixture

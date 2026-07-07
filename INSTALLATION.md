@@ -81,11 +81,11 @@ nano llm-fleet.csv
 ```
 Example CSV:
 
-| sort          | hostname	   |description	|endpoint	|ollama	|whisper	| piper |
-|---------------|-------------|---|---|---|---|---|
-| 10            | gpu-box	    | Main Ollama box	        |<your-ip-here>:11434	|true	|false	| false |
-| 20            | voice-stt	  | Whisper speech-to-text	 |<your-ip-here>:10300	|false	|true	| false |
-| 30|  voice-tts	 | Piper text-to-speech	 |<your-ip-here>:10200	|false	|false	| true |
+| sort | hostname  | description            | endpoint              | ollama | whisper | piper |
+|------|-----------|------------------------|-----------------------|--------|---------|-------|
+| 10   | gpu-box   | Main Ollama box        | <your-ip-here>:11434 | true   | false   | false |
+| 20   | voice-stt | Whisper speech-to-text | <your-ip-here>:10300 | false  | true    | false |
+| 30   | voice-tts | Piper text-to-speech   | <your-ip-here>:10200 | false  | false   | true  |
 
 Keep the real CSV private. It contains internal hostnames, IP addresses, ports, and service roles. Add llm-fleet.csv to .gitignore and commit only sanitized examples.
 
@@ -173,7 +173,7 @@ chmod 755 /usr/local/bin/llm-fleet-check
 ```
 Example cron entry for a five-minute check:
 ```
-*/5 * * * * llmfleet /usr/local/bin/llm-fleet-check >> /var/log/llm-fleet-check.log 2>&1
+*/5 * * * * llmfm /usr/local/bin/llm-fleet-check >> /var/log/llm-fleet-check.log 2>&1
 ```
 
 ## 12. Network and Firewall Requirements

@@ -51,14 +51,15 @@ python3 gui.py
 Both tools read a CSV with a header row. **One row = one endpoint = one service.**
 
 ```csv
-hostname,description,endpoint,ollama,whisper,piper
-gpu-box,"Main Ollama box",192.168.1.20:11434,true,false,false
-voice-stt,"Whisper speech-to-text",192.168.1.30:10300,false,true,false
-voice-tts,"Piper text-to-speech",192.168.1.30:10200,false,false,true
+sort,hostname,description,endpoint,ollama,whisper,piper
+10,gpu-box,"Main Ollama box",192.168.1.20:11434,true,false,false
+20,voice-stt,"Whisper speech-to-text",192.168.1.30:10300,false,true,false
+30,voice-tts,"Piper text-to-speech",192.168.1.30:10200,false,false,true
 ```
 
 | Column        | Meaning                                                                 |
 |---------------|-------------------------------------------------------------------------|
+| `sort`        | Integer display/order key. Required, must not be empty. Rows are ordered by `sort`; ties are broken by `hostname`. |
 | `hostname`    | A label for the row (shown in the report).                              |
 | `description` | A short sentence describing the check. Quote it if it contains commas.  |
 | `endpoint`    | `host:port` for this one service. Host may be an IP or DNS name; the port is required. |
@@ -68,10 +69,11 @@ voice-tts,"Piper text-to-speech",192.168.1.30:10200,false,false,true
 
 Rules:
 
+- `sort` is required and must be an integer. Rows with a missing or non-integer `sort` are skipped with a warning.
 - **Exactly one** of `ollama` / `whisper` / `piper` must be `true` per row — that selects how the endpoint is probed. (A single `host:port` addresses one service, so a row with zero or several flags set is skipped with a warning.)
 - Booleans are case-insensitive; `true/t/1/yes/y` are truthy, everything else is false.
 
-> **Heads up — don't commit your real host list.** A populated `llm-fleet.csv` is a map of your internal network (IPs, hostnames, which boxes run inference). Keep it out of version control. Ship/commit only a sanitized `llm-fleet.csv.example` with dummy values, and add `llm-fleet.csv` to your `.gitignore`.
+> **Heads up — don't commit your real host list.** A populated `llm-fleet.csv` is a map of your internal network (IPs, hostnames, which boxes run inference). Keep it out of version control. Ship/commit only a sanitized `example.llm-fleet.csv` with dummy values, and add `llm-fleet.csv` to your `.gitignore`.
 
 ---
 
@@ -85,7 +87,7 @@ python3 llm-fleet-monitor.py HOSTS_CSV [--timeout SECONDS] [--json] [--verbose] 
 |--------------------------|-----------------------------------------------------------------------------------------|
 | `HOSTS_CSV`              | Path to the host-list CSV (required).                                                    |
 | `--timeout SECONDS`      | Per-endpoint connect+read timeout. Default `3.0`.                                        |
-| `--json`                 | Emit the JSON envelope (`schema_version: 1`) to stdout instead of text. Ignores `--verbose`. |
+| `--json`                 | Emit the JSON envelope (`schema_version: 2`) to stdout instead of text. Ignores `--verbose`. |
 | `--verbose`              | Text mode only: expand the full Whisper/Piper model & voice lists instead of a count.   |
 | `--fail-on-unreachable`  | Exit with code `1` if any endpoint was unreachable (useful for cron / monitoring).      |
 
@@ -122,7 +124,7 @@ voice-stt — Whisper speech-to-text
 
 ### JSON output
 
-`--json` prints a single envelope: `{ "schema_version": 1, "probed_at": "...", "results": [ ... ] }`. This is the stable, machine-readable contract — point dashboards or monitoring at it. The schema is versioned; fields are added, never silently renamed.
+`--json` prints a single envelope: `{ "schema_version": 2, "probed_at": "...", "results": [ ... ] }`. This is the stable, machine-readable contract — point dashboards or monitoring at it. The schema is versioned; fields are added, never silently renamed.
 
 ---
 
@@ -165,7 +167,6 @@ To add a provider later, the design is meant to grow by adding a new boolean col
 
 - **HTMX is vendored locally, not loaded from a CDN.** The dashboard uses **HTMX 4** (a pre-release/beta at time of writing), served from the `htmax.js` file bundled in this repo rather than from a CDN. Reason: when loaded from the CDN with a pinned Subresource Integrity (SRI) hash, the browser refused to execute the beta build (SRI / cross-origin enforcement — a moving pre-release artifact and a pinned hash don't reliably agree). Serving a vetted local copy sidesteps that entirely and, as a bonus, means the dashboard's interactivity has no external CDN dependency. If you fork this and move to a stable HTMX release, you can switch back to a CDN `<script>` tag with a matching SRI hash, or keep vendoring — both work.
 - **`htmax.js` shows up as JavaScript in GitHub's language bar.** That's expected — it's a real vendored library file. To have GitHub classify the repo as Python, add a `.gitattributes` marking it vendored: `htmax.js linguist-vendored`.
-- **Default port:** the dashboard serves on **8766**. (An older `--help` string may still say 8765; 8766 is the value the code uses.)
 - The dashboard is intentionally tiny and localhost-only. If you want to expose it on a LAN or add authentication, that's on you — it ships with no auth.
 
 ---
