@@ -149,9 +149,25 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
 
             parts.append("<article>")
             # Header (split hostname and description into two lines within header)
+            # Determine provider icon (if any)
+            icon_file = {
+                "ollama": "ollama.png",
+                "whisper": "Whisper.png",
+                "piper": "Piper.png",
+            }.get(provider or "")
+
+            # Pico.css-friendly header with a small icon next to the title
+            if icon_file:
+                icon_tag = (
+                    f"<img src=\"/images/{icon_file}\" alt=\"{html_escape(provider)} icon\" "
+                    "width=\"28\" height=\"28\" loading=\"lazy\" style=\"vertical-align:middle;margin-right:.5rem;\">"
+                )
+            else:
+                icon_tag = ""
+
             parts.append(
                 "<header class=\"host-card-header\">"
-                f"<div class=\"host-title\"><strong>{html_escape(hostname)}</strong></div>"
+                f"<div class=\"host-title\">{icon_tag}<strong>{html_escape(hostname)}</strong></div>"
                 f"<div class=\"host-desc\">{html_escape(description)}</div>"
                 "</header>"
             )
@@ -353,6 +369,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            elif self.path.startswith("/images/"):
+                # Serve icons from HERE/images (png only)
+                name = Path(self.path).name
+                img_path = (HERE / "images" / name)
+                if img_path.exists() and img_path.suffix.lower() == ".png":
+                    body = img_path.read_bytes()
+                    self.send_response(HTTPStatus.OK)
+                    self.send_header("Content-Type", "image/png")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                else:
+                    self._send_html(HTTPStatus.NOT_FOUND, "<h3>Not Found</h3>")
             else:
                 self._send_html(HTTPStatus.NOT_FOUND, "<h3>Not Found</h3>")
         except Exception as e:
