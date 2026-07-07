@@ -115,6 +115,34 @@ class TestGuiRendering(unittest.TestCase):
         self.assertIn('hx-get="/fragment/hosts"', html)
         self.assertIn("/htmax.js", html)
 
+    def test_render_details_have_stable_ids_with_slugified_hostname(self):
+        env = {
+            "schema_version": 2,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "GPU Box #1",
+                    "description": "",
+                    "provider": "ollama",
+                    "endpoint": "127.0.0.1:11434",
+                    "reachable": True,
+                    "latency_ms": 12,
+                    "ollama": {
+                        "version": "1.0",
+                        "loaded": [
+                            {"name": "m1", "size": 1, "size_vram": 1, "gpu_fraction": 1.0, "ttl_seconds": 65}
+                        ],
+                        "downloaded": [{"name": "m1"}],
+                    },
+                }
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+        # slug("GPU Box #1") -> "gpu-box-1"
+        self.assertIn('id="ld-gpu-box-1"', html)
+        self.assertIn('id="dl-gpu-box-1"', html)
+
 
 class TestGuiProbeWrapper(unittest.TestCase):
     def test_probe_once_uses_probe_fleet_when_available(self):
@@ -172,6 +200,84 @@ class TestGuiProbeWrapper(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(gui.get_envelope()["results"], [])
+
+
+class TestPtagNormalization(unittest.TestCase):
+    def _base_host(self):
+        return {
+            "hostname": "h",
+            "provider": "ollama",
+            "endpoint": "e",
+            "reachable": True,
+            "latency_ms": 5,
+            "ollama": {
+                "version": "1.0",
+                "loaded": [
+                    {
+                        "name": "m",
+                        "size": 1,
+                        "size_vram": 1,
+                        "gpu_fraction": 1.0,
+                        "ttl_seconds": 65,
+                        "expires_at": "soon",
+                    }
+                ],
+                "downloaded": [{"name": "m"}],
+            },
+        }
+
+    def test_same_minute_bucket_same_tag(self):
+        h1 = self._base_host()
+        h2 = json.loads(json.dumps(h1))
+        h2["ollama"]["loaded"][0]["ttl_seconds"] = 70
+        env1 = {"results": [h1]}
+        env2 = {"results": [h2]}
+        self.assertEqual(gui.envelope_ptag(env1), gui.envelope_ptag(env2))
+
+    def test_different_minute_bucket_different_tag(self):
+        h1 = self._base_host()
+        h2 = json.loads(json.dumps(h1))
+        h2["ollama"]["loaded"][0]["ttl_seconds"] = 130
+        env1 = {"results": [h1]}
+        env2 = {"results": [h2]}
+        self.assertNotEqual(gui.envelope_ptag(env1), gui.envelope_ptag(env2))
+
+    def test_latency_ignored_same_tag(self):
+        h1 = self._base_host()
+        h2 = json.loads(json.dumps(h1))
+        h2["latency_ms"] = 40
+        env1 = {"results": [h1]}
+        env2 = {"results": [h2]}
+        self.assertEqual(gui.envelope_ptag(env1), gui.envelope_ptag(env2))
+
+    def test_forever_same_vs_numeric_different(self):
+        h1 = self._base_host()
+        h2 = json.loads(json.dumps(h1))
+        h1["ollama"]["loaded"][0]["ttl_seconds"] = "forever"
+        h2["ollama"]["loaded"][0]["ttl_seconds"] = "forever"
+        env1 = {"results": [h1]}
+        env2 = {"results": [h2]}
+        self.assertEqual(gui.envelope_ptag(env1), gui.envelope_ptag(env2))
+
+        h3 = json.loads(json.dumps(h1))
+        h3["ollama"]["loaded"][0]["ttl_seconds"] = 60
+        self.assertNotEqual(gui.envelope_ptag(env1), gui.envelope_ptag({"results": [h3]}))
+
+    def test_loaded_appearance_changes_tag(self):
+        h1 = self._base_host()
+        h2 = json.loads(json.dumps(h1))
+        # Remove the loaded model entirely
+        h2["ollama"]["loaded"] = []
+        env1 = {"results": [h1]}
+        env2 = {"results": [h2]}
+        self.assertNotEqual(gui.envelope_ptag(env1), gui.envelope_ptag(env2))
+
+    def test_ptag_does_not_mutate_input(self):
+        h1 = self._base_host()
+        env = {"results": [h1]}
+        before = json.loads(json.dumps(env))
+        _ = gui.envelope_ptag(env)
+        self.assertEqual(before, env)
 
 
 if __name__ == "__main__":

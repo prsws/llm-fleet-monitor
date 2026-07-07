@@ -41,3 +41,51 @@
 .downloaded-models small {
   display: block;
 }
+
+/* --- Scan indicator (htmx lifecycle) --- */
+#scan-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  opacity: .45;
+  color: var(--pico-muted-color, currentColor);
+  user-select: none;
+}
+
+#scan-indicator .dot {
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .6;
+}
+
+/* htmx applies the request class to the indicator element while a request is in-flight */
+#scan-indicator.htmx-request {
+  opacity: 1;
+}
+
+#scan-indicator.htmx-request .dot {
+  animation: scan-pulse 1s infinite ease-in-out;
+}
+
+@keyframes scan-pulse {
+  0%, 100% { transform: scale(1); opacity: .6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+/* Gentle occasional blink for the "scanning…" text (slow opacity pulse) */
+#scan-indicator small {
+  animation: scan-text-blink 3.2s ease-in-out infinite;
+}
+
+@keyframes scan-text-blink {
+  /* Spend most of the time near full opacity */
+  0%, 70%, 100% { opacity: 1; }
+  85% { opacity: 0.3; }
+}
+
+/* Respect reduced motion preferences: keep text steady */
+@media (prefers-reduced-motion: reduce) {
+  #scan-indicator small { animation: none; }
+}

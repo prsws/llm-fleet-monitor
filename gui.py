@@ -86,8 +86,72 @@ def get_envelope() -> Dict[str, Any]:
 
 
 def envelope_ptag(env: Dict[str, Any]) -> str:
-    # Stable tag for hx-ptag extension; hash the results content
-    s = json.dumps({"results": env.get("results", [])}, sort_keys=True, separators=(",", ":"))
+    """
+    Produce a stable page tag for the current fleet results, suitable for the
+    htmx ptag extension to suppress no-op swaps.
+
+    WHY: Raw results include volatile fields that change nearly every poll
+    (`latency_ms`, per-model `expires_at`, and `ttl_seconds` ticking down),
+    which would defeat change detection. We therefore compute the hash over a
+    NORMALIZED deep copy that:
+      - removes `latency_ms` from each host result;
+      - removes `expires_at` from each loaded-model entry;
+      - replaces each loaded-model `ttl_seconds` with a bucketed `ttl_bucket`:
+          * the string "forever" stays "forever";
+          * numeric becomes int(ttl_seconds)//60 (minutes floor);
+          * missing/None stays None.
+    All other fields (reachability, errors, versions, loaded model names/sizes,
+    GPU fraction, downloaded inventory, whisper/piper blocks) remain as-is in
+    the hash input. This yields stable tags within the same TTL minute, and tag
+    changes on real state transitions or TTL minute rollovers.
+    """
+    # Start from a JSON round-trip to deep-copy without mutating the cache
+    src_results = json.loads(json.dumps(env.get("results", [])))
+
+    def _ttl_bucket(val: Any):
+        if val is None:
+            return None
+        if val == "forever":
+            return "forever"
+        try:
+            return int(val) // 60
+        except Exception:
+            return None
+
+    norm_results: List[Dict[str, Any]] = []
+    for rec in src_results:
+        if not isinstance(rec, dict):
+            norm_results.append(rec)
+            continue
+        r = dict(rec)
+        # Remove volatile host-level latency
+        r.pop("latency_ms", None)
+
+        # Provider-specific normalization
+        prov = r.get("provider")
+        if prov == "ollama" and isinstance(r.get("ollama"), dict):
+            o = dict(r["ollama"])  # type: ignore[index]
+            # Normalize loaded models
+            loaded = []
+            for m in o.get("loaded") or []:
+                if not isinstance(m, dict):
+                    loaded.append(m)
+                    continue
+                mm = dict(m)
+                mm.pop("expires_at", None)
+                if "ttl_seconds" in mm:
+                    mm["ttl_bucket"] = _ttl_bucket(mm.get("ttl_seconds"))
+                    mm.pop("ttl_seconds", None)
+                else:
+                    mm["ttl_bucket"] = _ttl_bucket(None)
+                loaded.append(mm)
+            o["loaded"] = loaded
+            r["ollama"] = o
+        # whisper/piper blocks are kept as-is
+
+        norm_results.append(r)
+
+    s = json.dumps({"results": norm_results}, sort_keys=True, separators=(",", ":"))
     return sha256(s.encode("utf-8")).hexdigest()
 
 
@@ -138,6 +202,20 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
     if not results:
         parts.append("<p>No hosts to display.</p>")
     else:
+        def _slugify(h: str) -> str:
+            # Lowercase and replace non-alphanumerics with '-'
+            out = []
+            for ch in (h or "").lower():
+                if ("a" <= ch <= "z") or ("0" <= ch <= "9"):
+                    out.append(ch)
+                else:
+                    out.append("-")
+            # Collapse consecutive dashes
+            slug = "".join(out)
+            while "--" in slug:
+                slug = slug.replace("--", "-")
+            return slug.strip("-") or "host"
+
         for rec in results:
             hostname = rec.get("hostname", "?")
             description = rec.get("description", "")
@@ -146,6 +224,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
             reachable = bool(rec.get("reachable"))
             latency_ms = rec.get("latency_ms")
             err = rec.get("error") or None
+            slug = _slugify(str(hostname))
 
             parts.append("<article>")
             # Header (split hostname and description into two lines within header)
@@ -193,11 +272,15 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 o = rec["ollama"] or {}
                 ver = (o.get("version") or "").strip()
                 if ver:
-                    parts.append(f"<p><strong>version</strong> {html_escape(ver)}</p>")
+                    parts.append(f"<p><strong>Version</strong> {html_escape(ver)}</p>")
 
                 loaded = o.get("loaded") or []
                 if loaded:
-                    parts.append("<details open><summary>Loaded (ps)</summary><ul>")
+                    # Loaded: do NOT preserve element content (TTLs must update on real swaps).
+                    # Provide a stable id to allow Idiomorph to match elements across swaps.
+                    # Per htmx 4 beta5 docs (see /docs.md under "Swapping" and Idiomorph),
+                    # using the morph swap allows attribute-preserving matching by id.
+                    parts.append(f"<details id=\"ld-{slug}\" open><summary>Running (ps)</summary><ul>")
                     for m in loaded:
                         name = html_escape(str(m.get("name") or "?"))
                         size = human_size(m.get("size"))
@@ -212,13 +295,18 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         )
                     parts.append("</ul></details>")
                 else:
-                    parts.append("<p>Up, nothing loaded</p>")
+                    parts.append("<p>Up, nothing running</p>")
 
                 inv = o.get("downloaded") or []
-                parts.append(f"<p>Downloaded (ls): {len(inv)} model{'s' if len(inv)!=1 else ''}</p>")
-                # Render a Pico.css-compatible accordion for downloaded models (if any)
+                # Consolidate downloaded count into the accordion header. When empty, show a plain line.
+                # NOTE: Count lives inside an hx-preserve'd <details>, so it freezes across swaps (updates on page load).
                 if inv:
-                    parts.append("<details><summary>Downloaded models</summary><ul class=\"downloaded-models\">")
+                    # Downloaded: preserve the element to keep open/closed state across swaps.
+                    # Per htmx 4 beta5 docs (/docs.md "Preserving Elements Across Swaps"),
+                    # adding the `hx-preserve` attribute keeps the existing element instance.
+                    parts.append(
+                        f"<details id=\"dl-{slug}\" hx-preserve><summary>Downloaded models (ls): {len(inv)}</summary><ul class=\"downloaded-models\">"
+                    )
                     for m in inv:
                         nm = html_escape(str(m.get("name") or "?"))
 
@@ -239,8 +327,9 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                             parts.append(f"<li><code>{nm}</code><small>{metadata}</small></li>")
                         else:
                             parts.append(f"<li><code>{nm}</code></li>")
-
                     parts.append("</ul></details>")
+                else:
+                    parts.append("<p>Downloaded models (ls): 0</p>")
 
             elif provider == "whisper" and rec.get("whisper"):
                 w = rec["whisper"] or {}
@@ -311,10 +400,14 @@ COMMENTED OUT ON PURPOSE BY JOSE 20260630 - replace htmx4 cdn with local downloa
            hx-ext=\"browser-indicator,ptag\" 
            hx-get=\"/fragment/hosts\" 
            hx-trigger=\"every {REFRESH_SECONDS}s\" 
-           hx-swap=\"innerHTML\">
+           hx-indicator=\"#scan-indicator\"
+           hx-swap=\"innerMorph\">
         {fragment}
       </div>
-      <p><small>&copy; 2026 José F. Reyes Santana. Polling every {REFRESH_SECONDS}s via HTMX 4.</small></p>
+      <!-- htmx 4 beta5: use innerMorph (Idiomorph) to preserve element instances by id; docs: https://four.htmx.org/docs ("Morph Swaps").
+           Preserve Downloaded accordions with hx-preserve; docs: https://htmx.org/attributes/hx-preserve -->
+      <div id=\"scan-indicator\" aria-live=\"polite\"><span class=\"dot\" aria-hidden=\"true\"></span> <small>scanning…</small></div>
+      <p><small>Polling every {REFRESH_SECONDS}s. Powered by Python, HTMX4 & PicoCSS.</small></p>
     </main>
   </body>
  </html>
