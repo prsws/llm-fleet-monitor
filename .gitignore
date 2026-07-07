@@ -21,3 +21,4 @@ build/
 # Secrets / local config
 *.env
 .env*
+/llm-fleet.csv
