@@ -131,6 +131,7 @@
 /* Respect reduced motion preferences: keep text steady */
 @media (prefers-reduced-motion: reduce) {
   #scan-indicator small { animation: none; }
+  .red-blink { animation: none; }
 }
 
 /* Define the class */
