@@ -85,6 +85,12 @@ def classify_error(exc: BaseException) -> Tuple[str, str]:
         return "refused", str(exc)
     if isinstance(exc, socket.gaierror):
         return "dns", str(exc)
+    if isinstance(exc, HTTPError):
+        # Check for auth errors first (401/403)
+        if exc.code in (401, 403):
+            return "auth", "endpoint requires an API key (not supported)"
+        # HTTP connected but provider error or wrong path → protocol
+        return "protocol", f"HTTP {exc.code}: {exc.reason}"
     if isinstance(exc, URLError):
         # URLError wraps many reasons, including timeout
         reason = getattr(exc, 'reason', None)
@@ -95,9 +101,6 @@ def classify_error(exc: BaseException) -> Tuple[str, str]:
         if isinstance(reason, socket.gaierror):
             return "dns", str(exc)
         return "other", str(exc)
-    if isinstance(exc, HTTPError):
-        # HTTP connected but provider error or wrong path → protocol
-        return "protocol", f"HTTP {exc.code}: {exc.reason}"
     if isinstance(exc, json.JSONDecodeError):
         return "protocol", str(exc)
     return "other", str(exc)
@@ -119,6 +122,16 @@ def http_get_json(host: str, port: int, path: str, timeout: float) -> Dict[str, 
     with urlopen(req, timeout=timeout) as resp:
         data = resp.read()
     return json.loads(data.decode("utf-8"))
+
+
+def http_get_json_with_headers(host: str, port: int, path: str, timeout: float) -> Tuple[Dict[str, Any], Optional[str]]:
+    """Get JSON and return (data, Server header value or None)"""
+    url = urlunparse(("http", f"{host}:{port}", path, "", "", ""))
+    req = Request(url, headers={"Accept": "application/json"})
+    with urlopen(req, timeout=timeout) as resp:
+        data = resp.read()
+        server = resp.headers.get("Server")
+    return json.loads(data.decode("utf-8")), server
 
 
 def _norm(v: Any) -> Optional[str]:
@@ -306,6 +319,36 @@ def probe_wyoming(host: str, port: int, timeout: float, kind: str) -> Tuple[bool
         return False, None, None, {"kind": kind_s, "detail": detail}
 
 
+def probe_openai(host: str, port: int, timeout: float) -> Tuple[bool, Optional[int], Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
+    start = time.perf_counter()
+    try:
+        data, server = http_get_json_with_headers(host, port, "/v1/models", timeout)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+
+        # Parse models: keep id and owned_by (null when absent/empty)
+        models = []
+        for entry in data.get("data", []) or []:
+            model_id = entry.get("id")
+            if model_id:  # Skip entries without id
+                owned_by = entry.get("owned_by")
+                # Normalize empty string to None
+                if owned_by == "":
+                    owned_by = None
+                models.append({
+                    "id": model_id,
+                    "owned_by": owned_by,
+                })
+
+        result = {
+            "server": server,
+            "models": models,
+        }
+        return True, latency_ms, result, None
+    except Exception as e:
+        kind, detail = classify_error(e)
+        return False, None, None, {"kind": kind, "detail": detail}
+
+
 # ------------------------- CSV & Orchestration -------------------------
 
 
@@ -315,7 +358,7 @@ class Row:
     hostname: str
     description: str
     endpoint: str
-    provider: str  # "ollama" | "whisper" | "piper"
+    provider: str  # "ollama" | "whisper" | "piper" | "openai"
 
 
 def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
@@ -324,7 +367,7 @@ def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
     try:
         with open(csv_path, newline='', encoding='utf-8') as f:
             rdr = csv.DictReader(f)
-            required = ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper"]
+            required = ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper", "openai"]
             missing = [c for c in required if c not in (rdr.fieldnames or [])]
             if missing:
                 raise ValueError(f"CSV missing required column(s): {', '.join(missing)}")
@@ -350,6 +393,7 @@ def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
                         "ollama": parse_bool(r.get("ollama")),
                         "whisper": parse_bool(r.get("whisper")),
                         "piper": parse_bool(r.get("piper")),
+                        "openai": parse_bool(r.get("openai")),
                     }
                     true_flags = [k for k, v in flags.items() if v]
                     if len(true_flags) != 1:
@@ -387,6 +431,7 @@ def build_record(row: Row, timeout: float) -> Dict[str, Any]:
         "ollama": None,
         "whisper": None,
         "piper": None,
+        "openai": None,
     }
     if row.provider == "ollama":
         ok, latency, data, err = probe_ollama(host, port, timeout)
@@ -400,6 +445,12 @@ def build_record(row: Row, timeout: float) -> Dict[str, Any]:
         base["latency_ms"] = latency
         base["error"] = err
         base[row.provider] = data if ok else None
+    elif row.provider == "openai":
+        ok, latency, data, err = probe_openai(host, port, timeout)
+        base["reachable"] = ok
+        base["latency_ms"] = latency
+        base["error"] = err
+        base["openai"] = data if ok else None
     else:
         base["error"] = {"kind": "other", "detail": f"unknown provider {row.provider}"}
     return base
@@ -429,12 +480,13 @@ def run_probe(rows: List[Row], timeout: float, max_workers: int = 16) -> Dict[st
                     "ollama": None,
                     "whisper": None,
                     "piper": None,
+                    "openai": None,
                 }
             results.append(rec)
     # Sort results deterministically by (sort, str(sort)+hostname)
     results.sort(key=lambda rec: (rec.get("sort", 0), f"{rec.get('sort', 0)}{rec.get('hostname') or ''}"))
     # Phase 2A: add stable top-level schema version for machine-consumable output
-    return {"schema_version": 2, "probed_at": probed_at, "results": results}
+    return {"schema_version": 3, "probed_at": probed_at, "results": results}
 
 
 # ------------------------- Importable API -------------------------
@@ -471,6 +523,7 @@ def render_text(envelope: Dict[str, Any], *, verbose: bool = False) -> str:
             "ollama": "ollama",
             "whisper": "whisper/wyoming",
             "piper": "piper/wyoming",
+            "openai": "openai",
         }.get(provider, provider)
         lines.append(f"  endpoint   {endpoint}  [{tag}]")
         # Reachability
@@ -576,6 +629,28 @@ def render_text(envelope: Dict[str, Any], *, verbose: bool = False) -> str:
                     m = len(lang_set)
                     lines.append(f"  voices     {n} installed across {m} langs")
 
+        elif provider == "openai" and rec.get("openai"):
+            o = rec["openai"]
+            server = (o.get("server") or "").strip()
+            if server:
+                lines.append(f"  server     {server}")
+            models = o.get("models") or []
+            if models:
+                # Format: comma-joined ids on wrapped lines, count in header
+                lines.append(f"  models     {len(models)} available")
+                if verbose:
+                    for m in models:
+                        model_id = m.get("id") or "?"
+                        owned_by = m.get("owned_by")
+                        text = f"{model_id}"
+                        if owned_by:
+                            text += f" ({owned_by})"
+                        lines.append(f"    {text}")
+                else:
+                    # Default: comma-joined ids on wrapped lines
+                    ids = [m.get("id") or "?" for m in models]
+                    lines.append("    " + ", ".join(ids))
+
         lines.append("")  # blank line between blocks
     return "\n".join(lines).rstrip() + "\n"
 
@@ -585,10 +660,10 @@ def render_text(envelope: Dict[str, Any], *, verbose: bool = False) -> str:
 
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="llm_fleet_monitor.py", description="Probe a fleet of LLM/voice endpoints and report status.")
-    p.add_argument("hosts_csv", help="Path to hosts CSV with columns: sort,hostname,description,endpoint,ollama,whisper,piper")
+    p.add_argument("hosts_csv", help="Path to hosts CSV with columns: sort,hostname,description,endpoint,ollama,whisper,piper,openai")
     p.add_argument("--timeout", type=float, default=3.0, help="Per-endpoint connect+read timeout in seconds (default 3.0)")
-    p.add_argument("--json", dest="as_json", action="store_true", help="Emit the JSON envelope (schema_version=2) to stdout; silently ignores --verbose")
-    p.add_argument("--verbose", action="store_true", help="Text view only: show full Whisper/Piper details; ignored with --json")
+    p.add_argument("--json", dest="as_json", action="store_true", help="Emit the JSON envelope (schema_version=3) to stdout; silently ignores --verbose")
+    p.add_argument("--verbose", action="store_true", help="Text view only: show full Whisper/Piper/OpenAI details; ignored with --json")
     p.add_argument("--fail-on-unreachable", action="store_true", help="Exit 1 if any endpoint is unreachable")
 
     args = p.parse_args(argv)

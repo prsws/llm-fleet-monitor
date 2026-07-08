@@ -10,7 +10,7 @@ LLM Fleet Monitor ships as two Python scripts:
 * llm-fleet-monitor.py — the command-line probe. It reads a CSV host list, probes all endpoints concurrently, and prints either a readable report or JSON output.
 * gui.py — an optional lightweight web dashboard. It polls the probe every 10 seconds and renders live host cards in a browser.
 
-The tool monitors Ollama over its HTTP API and Whisper/Piper speech services over the Wyoming protocol. It reports reachability, versions, loaded Ollama models, GPU versus CPU residency, keep-alive countdowns, downloaded model inventory, and available speech models or voices.
+The tool monitors Ollama over its HTTP API, Whisper/Piper speech services over the Wyoming protocol, and OpenAI-compatible runners (e.g., llama.cpp) over `/v1/models` HTTP. It reports reachability, versions, loaded Ollama models, GPU versus CPU residency, keep-alive countdowns, downloaded model inventory, and available speech models or voices.
 
 ## 3. Recommended LXC Design
 Use an unprivileged Debian-based LXC. Proxmox containers share the host kernel and are intended for lightweight Linux workloads; unprivileged containers improve isolation by mapping container root to an unprivileged host UID range.
@@ -70,7 +70,7 @@ cd /opt/llm-fleet-monitor
 ```
 
 ## 7. Configure the Host List
-The monitor reads a CSV file with one row per service endpoint. A single row must select exactly one service type: Ollama, Whisper, or Piper.
+The monitor reads a CSV file with one row per service endpoint. A single row must select exactly one service type: Ollama, Whisper, Piper, or OpenAI-compatible.
 The sort column must not be empty and in case of collisions the gui adds the hostname to disambiguate.
 ```
 cd /opt/llm-fleet-monitor
@@ -81,11 +81,12 @@ nano llm-fleet.csv
 ```
 Example CSV:
 
-| sort | hostname  | description            | endpoint              | ollama | whisper | piper |
-|------|-----------|------------------------|-----------------------|--------|---------|-------|
-| 10   | gpu-box   | Main Ollama box        | <your-ip-here>:11434 | true   | false   | false |
-| 20   | voice-stt | Whisper speech-to-text | <your-ip-here>:10300 | false  | true    | false |
-| 30   | voice-tts | Piper text-to-speech   | <your-ip-here>:10200 | false  | false   | true  |
+| sort | hostname  | description            | endpoint              | ollama | whisper | piper | openai |
+|------|-----------|------------------------|-----------------------|--------|---------|-------|--------|
+| 10   | gpu-box   | Main Ollama box        | <your-ip-here>:11434 | true   | false   | false | false  |
+| 20   | voice-stt | Whisper speech-to-text | <your-ip-here>:10300 | false  | true    | false | false  |
+| 30   | voice-tts | Piper text-to-speech   | <your-ip-here>:10200 | false  | false   | true  | false  |
+| 40   | llamabox  | llama.cpp on NUC       | <your-ip-here>:8080  | false  | false   | false | true   |
 
 Keep the real CSV private. It contains internal hostnames, IP addresses, ports, and service roles. Add llm-fleet.csv to .gitignore and commit only sanitized examples.
 
@@ -181,6 +182,7 @@ The LXC must be able to initiate outbound TCP connections to every endpoint list
 * Ollama: TCP 11434, unless customized.
 * Wyoming Whisper: commonly TCP 10300.
 * Wyoming Piper: commonly TCP 10200.
+* OpenAI-compatible runners (llama.cpp): commonly TCP 8080, varies by runner.
 * Dashboard: TCP 8766 only inside the LXC by default because it binds to localhost.
 
 Basic reachability tests from inside the LXC:
@@ -189,6 +191,8 @@ nc -vz <your-ip-here> 11434
 curl -s http://<your-ip-here>:11434/api/version
 nc -vz <your-ip-here> 10300
 nc -vz <your-ip-here> 10200
+nc -vz <your-ip-here> 8080
+curl -s http://<your-ip-here>:8080/v1/models
 ```
 
 ## 13. Security Notes
@@ -233,7 +237,7 @@ python3 -m unittest gui_tests.py
 |---|----------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
 |Unable to pull git repo	| Network issues or incorrect SSH key setup.                                                                                             | Ensure the container can reach GitHub over HTTPS and that any required authentication is configured.   |
 |CLI probe crashes with ImportError	| Missing Python packages or incompatible versions.                                                                                      | Review and install missing Python libraries from within the LXC.                                       |
-|CSV rows are skipped	| Zero or multiple provider flags are true	                                                                                              | Edit the row so exactly one of ollama, whisper, or piper is true.                                      |
+|CSV rows are skipped	| Zero or multiple provider flags are true	                                                                                              | Edit the row so exactly one of ollama, whisper, piper, or openai is true.                              |
 |Ollama endpoint is refused	| Ollama is not listening on the listed host and port	                                                                                   | Verify Ollama is running and reachable from the LXC with curl or nc.                                   |
 |DNS failure	| Container cannot resolve the hostname	                                                                                                 | Check the LXC DNS settings in Proxmox or use a static IP in the CSV.                                   |
 |Dashboard starts but browser looks unstyled	| The browser cannot load Pico.css from the CDN	| Allow browser internet access for styling or accept the unstyled functional page.                      |

@@ -63,7 +63,7 @@ class TestLlmFleetMonitorUtilities(unittest.TestCase):
 
 class TestLlmFleetMonitorCsv(unittest.TestCase):
     def write_csv(self, rows, fieldnames=None):
-        fieldnames = fieldnames or ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper"]
+        fieldnames = fieldnames or ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper", "openai"]
         tmp = tempfile.NamedTemporaryFile("w", newline="", encoding="utf-8", delete=False)
         with tmp:
             writer = csv.DictWriter(tmp, fieldnames=fieldnames)
@@ -82,6 +82,7 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
                     "ollama": "true",
                     "whisper": "false",
                     "piper": "false",
+                    "openai": "false",
                 }
             ]
         )
@@ -105,6 +106,7 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
                     "ollama": "true",
                     "whisper": "true",
                     "piper": "false",
+                    "openai": "false",
                 }
             ]
         )
@@ -126,6 +128,7 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
                     "ollama": "true",
                     "whisper": "false",
                     "piper": "false",
+                    "openai": "false",
                 }
             ]
         )
@@ -147,6 +150,7 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
                     "ollama": "true",
                     "whisper": "false",
                     "piper": "false",
+                    "openai": "false",
                 }
             ]
         )
@@ -167,6 +171,7 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
                     "ollama": "true",
                     "whisper": "false",
                     "piper": "false",
+                    "openai": "false",
                 }
             ]
         )
@@ -187,20 +192,65 @@ class TestLlmFleetMonitorCsv(unittest.TestCase):
                     "ollama": "true",
                     "whisper": "false",
                     "piper": "false",
+                    "openai": "false",
                 }
             ],
-            fieldnames=["hostname", "description", "endpoint", "ollama", "whisper", "piper"],
+            fieldnames=["hostname", "description", "endpoint", "ollama", "whisper", "piper", "openai"],
         )
 
         with self.assertRaises(ValueError) as cm:
             monitor.read_rows(path)
         self.assertIn("sort", str(cm.exception))
 
+    def test_read_rows_accepts_openai_provider(self):
+        path = self.write_csv(
+            [
+                {
+                    "sort": "10",
+                    "hostname": "openai-host",
+                    "description": "OpenAI-compatible endpoint",
+                    "endpoint": "127.0.0.1:8000",
+                    "ollama": "false",
+                    "whisper": "false",
+                    "piper": "false",
+                    "openai": "true",
+                }
+            ]
+        )
+
+        rows, warnings = monitor.read_rows(path)
+
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].hostname, "openai-host")
+        self.assertEqual(rows[0].provider, "openai")
+
+    def test_read_rows_rejects_missing_openai_column(self):
+        # CSV without openai column should fail at startup
+        path = self.write_csv(
+            [
+                {
+                    "sort": "10",
+                    "hostname": "ok",
+                    "description": "Missing openai column",
+                    "endpoint": "127.0.0.1:11434",
+                    "ollama": "false",
+                    "whisper": "false",
+                    "piper": "true",
+                }
+            ],
+            fieldnames=["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper"],
+        )
+
+        with self.assertRaises(ValueError) as cm:
+            monitor.read_rows(path)
+        self.assertIn("openai", str(cm.exception))
+
 
 class TestLlmFleetMonitorRendering(unittest.TestCase):
     def test_render_text_for_unreachable_host(self):
         envelope = {
-            "schema_version": 2,
+            "schema_version": 3,
             "probed_at": "now",
             "results": [
                 {
@@ -215,6 +265,7 @@ class TestLlmFleetMonitorRendering(unittest.TestCase):
                     "ollama": None,
                     "whisper": None,
                     "piper": None,
+                    "openai": None,
                 }
             ],
         }
@@ -226,7 +277,7 @@ class TestLlmFleetMonitorRendering(unittest.TestCase):
 
     def test_probe_fleet_uses_read_rows_and_run_probe(self):
         fake_rows = [monitor.Row(10, "h", "d", "127.0.0.1:1", "ollama")]
-        fake_envelope = {"schema_version": 2, "probed_at": "x", "results": []}
+        fake_envelope = {"schema_version": 3, "probed_at": "x", "results": []}
 
         with patch.object(monitor, "read_rows", return_value=(fake_rows, [])) as read_rows:
             with patch.object(monitor, "run_probe", return_value=fake_envelope) as run_probe:
@@ -267,7 +318,7 @@ class TestLlmFleetMonitorSorting(unittest.TestCase):
 
         self.assertEqual([r["hostname"] for r in env["results"]], ["aaa", "zzz"])
 
-    def test_run_probe_schema_version_is_2(self):
+    def test_run_probe_schema_version_is_3(self):
         rows = [monitor.Row(10, "a", "d", "127.0.0.1:1", "ollama")]
 
         def fake_build_record(row, timeout):
@@ -276,7 +327,7 @@ class TestLlmFleetMonitorSorting(unittest.TestCase):
         with patch.object(monitor, "build_record", side_effect=fake_build_record):
             env = monitor.run_probe(rows, timeout=1.0)
 
-        self.assertEqual(env["schema_version"], 2)
+        self.assertEqual(env["schema_version"], 3)
 
 
 if __name__ == "__main__":
