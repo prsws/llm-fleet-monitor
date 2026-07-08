@@ -9,6 +9,12 @@
   color: navy;
 }
 
+.property-name-alt {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: blue;
+}
+
 .property-value {
   font-size: 0.8rem;
   font-weight: normal;

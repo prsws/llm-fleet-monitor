@@ -287,7 +287,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # Provide a stable id to allow Idiomorph to match elements across swaps.
                     # Per htmx 4 beta5 docs (see /docs.md under "Swapping" and Idiomorph),
                     # using the morph swap allows attribute-preserving matching by id.
-#                    parts.append(f"<hr />")
+                    parts.append(f"<br />")
                     parts.append(f"<details id=\"ld-{slug}\" open><summary><span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">{len(loaded)}</span></summary>")
                     for m in loaded:
                         name = html_escape(str(m.get("name") or "?"))
@@ -297,10 +297,10 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         spilled = isinstance(gpu_frac, (int, float)) and gpu_frac < 1.0
                         gpu_pct = f"{int(round(gpu_frac * 100))}%" if isinstance(gpu_frac, (int, float)) else "?"
                         ttl = human_ttl(m.get("ttl_seconds")) if m.get("ttl_seconds") is not None else "?"
-                        spill_note = " — <p class=\"red-blink\">SPILLED</p> &#129751;" if spilled else ""
+                        spill_note = " — <span class=\"red-blink\">SPILLED</span> &#129751;" if spilled else ""
                         parts.append(
                             "<table class=\"model-table\">"
-                            f"<thead><tr><th colspan=\"2\"><code>{name}</code></th></tr></thead>"
+                            f"<thead><tr><th colspan=\"2\" class=\"property-name-alt\">{name}</th></tr></thead>"
                             "<tbody>"
                             f"<tr><td class=\"property-name\">&#128207; Size</td><td class=\"property-value\">{size}</td></tr>"
                             f"<tr><td class=\"property-name\">&#x1F40F; VRAM</td><td class=\"property-value\">{vram} ({gpu_pct} GPU){spill_note}</td></tr>"
@@ -309,7 +309,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         )
                     parts.append("</details>")
                 else:
-                    parts.append("<span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">&#x2B06; Up, but nothing running</span>")
+                    parts.append("<div><span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">&#x2B06; Up, nothing running</span></div>")
 
                 inv = o.get("downloaded") or []
                 # Consolidate downloaded count into the accordion header. When empty, show a plain line.
