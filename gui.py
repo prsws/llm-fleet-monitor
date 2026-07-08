@@ -279,13 +279,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 o = rec["ollama"] or {}
                 ver = (o.get("version") or "").strip()
                 if ver:
-#                    parts.append(f"<h6 class=\"property-name\">Version</h6> <p  class=\"property-value\">{html_escape(ver)}</p>")
-                    parts.append(
-                        "<table class=\"model-table status-table\">"
-                        "<tbody>"
-                        f"<tr><td class=\"property-name\">Version</td><td class=\"property-value\">{html_escape(ver)}</td></tr>"
-                        "</tbody></table>"
-                    )
+                    parts.append(f"<span class=\"property-name indent-span\">Version</span> <span class=\"property-value\">{html_escape(ver)}</span>")
 
                 loaded = o.get("loaded") or []
                 if loaded:
@@ -294,7 +288,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # Per htmx 4 beta5 docs (see /docs.md under "Swapping" and Idiomorph),
                     # using the morph swap allows attribute-preserving matching by id.
 #                    parts.append(f"<hr />")
-                    parts.append(f"<details id=\"ld-{slug}\" open><summary><span class=\"property-name\">Running models (ps):</span> <span class=\"property-value\">{len(loaded)}</span></summary>")
+                    parts.append(f"<details id=\"ld-{slug}\" open><summary><span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">{len(loaded)}</span></summary>")
                     for m in loaded:
                         name = html_escape(str(m.get("name") or "?"))
                         size = human_size(m.get("size"))
@@ -308,14 +302,14 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                             "<table class=\"model-table\">"
                             f"<thead><tr><th colspan=\"2\"><code>{name}</code></th></tr></thead>"
                             "<tbody>"
-                            f"<tr><td>&#128207; <p class=\"property-name\">Size</p></td><td><p class=\"property-value\">{size}</p></td></tr>"
-                            f"<tr><td>&#x1F40F; <p class=\"property-name\">VRAM</p></td><td><p class=\"property-value\">{vram} ({gpu_pct} GPU){spill_note}</p></td></tr>"
-                            f"<tr><td>&#9201; <p class=\"property-name\">TTL</p></td><td><p class=\"property-value\">{ttl}</p></td></tr>"
+                            f"<tr><td class=\"property-name\">&#128207; Size</td><td class=\"property-value\">{size}</td></tr>"
+                            f"<tr><td class=\"property-name\">&#x1F40F; VRAM</td><td class=\"property-value\">{vram} ({gpu_pct} GPU){spill_note}</td></tr>"
+                            f"<tr><td class=\"property-name\">&#9201; TTL</td><td class=\"property-value\">{ttl}</td></tr>"
                             "</tbody></table>"
                         )
                     parts.append("</details>")
                 else:
-                    parts.append("<span class=\"property-name\">Running models (ps):</span> <span class=\"property-value\">&#x2B06; Up, but nothing running</span>")
+                    parts.append("<span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">&#x2B06; Up, but nothing running</span>")
 
                 inv = o.get("downloaded") or []
                 # Consolidate downloaded count into the accordion header. When empty, show a plain line.
@@ -325,11 +319,8 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # Per htmx 4 beta5 docs (/docs.md "Preserving Elements Across Swaps"),
                     # adding the `hx-preserve` attribute keeps the existing element instance.
 #                    parts.append(f"<hr />")
-                    parts.append(f"<details id=\"dl-{slug}\" hx-preserve><summary><span class=\"property-name\">Downloaded models (ls):</span> <span class=\"property-value\">{len(inv)}</span></summary>")
+                    parts.append(f"<details id=\"dl-{slug}\" hx-preserve><summary><span class=\"property-name indent-span\">Downloaded models (ls):</span> <span class=\"property-value\">{len(inv)}</span></summary>")
 
-                    # parts.append(
-                    #     f"<details id=\"dl-{slug}\" hx-preserve><summary><strong>Downloaded models</strong> (ls): {len(inv)}</summary>"
-                    # )
                     for m in inv:
                         nm = html_escape(str(m.get("name") or "?"))
                         # Build rows conditionally; size is always present in downloaded entries

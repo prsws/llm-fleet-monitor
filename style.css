@@ -50,8 +50,7 @@
 
 /* Compact tables for per-model attributes (Pico classless tables) */
 .model-table {
-  margin-bottom: calc(var(--pico-spacing) * .75);
-
+  margin-bottom: calc(var(--pico-spacing) * 0.2);
 }
 
 .model-table th, .model-table td {
@@ -67,6 +66,11 @@
 /* Compact status table at top of each card; shares model-table styling */
 .status-table {
   margin-bottom: var(--pico-spacing);
+}
+
+/* Compact status table at top of each card; shares model-table styling */
+.indent-span {
+  padding: .2rem .4rem;
 }
 
 /* --- Scan indicator (htmx lifecycle) --- */
