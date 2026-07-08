@@ -1,3 +1,20 @@
+.page-title {
+  color: navy;
+  font-size: 2rem;
+}
+
+.property-name {
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: navy;
+}
+
+.property-value {
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: black;
+}
+
 #host-cards {
   display: flex;
   flex-wrap: wrap;
@@ -13,8 +30,10 @@
 /* Host card header with two-line layout */
 #host-cards > article > header.host-card-header {
   display: block;
-  line-height: 1.2;
-  margin-bottom: var(--pico-spacing);
+  line-height: 1;
+  margin-bottom: calc(var(--pico-spacing) * 0.5);
+  background-color: lightcyan;
+  color: navy;
 }
 
 #host-cards .host-title {
@@ -32,7 +51,7 @@
 /* Compact tables for per-model attributes (Pico classless tables) */
 .model-table {
   margin-bottom: calc(var(--pico-spacing) * .75);
-  font-size: .875rem;
+
 }
 
 .model-table th, .model-table td {
@@ -96,4 +115,17 @@
 /* Respect reduced motion preferences: keep text steady */
 @media (prefers-reduced-motion: reduce) {
   #scan-indicator small { animation: none; }
+}
+
+/* Define the class */
+.red-blink {
+  color: #ff0000; /* Sets text color to red */
+  font-weight: bold;
+  animation: smooth-blink 1.2s linear infinite; /* Smooth continuous timeline */
+}
+
+/* Define the animation steps */
+@keyframes smooth-blink {
+  0%, 100% { opacity: 1; }  /* Fully visible at start and end */
+  50% { opacity: 0; }       /* Fully invisible halfway through */
 }

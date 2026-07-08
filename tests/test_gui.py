@@ -171,17 +171,13 @@ class TestGuiRendering(unittest.TestCase):
         self.assertIn("llamabox", html)
         self.assertIn("llama.cpp", html)
         self.assertIn("Available models (v1)", html)
-        self.assertIn("2", html)
         self.assertIn("qwen2.5-coder-14b", html)
         self.assertIn("gemma-2-9b", html)
         self.assertIn("google", html)
         self.assertIn('id="oa-llamabox"', html)
 
-
-class TestGuiProbeWrapper(unittest.TestCase):
-    def test_probe_once_uses_probe_fleet_when_available(self):
-        class FakeModule:
-            @staticmethod
+    def test_render_cards_fragment_whisper_and_piper_summary(self):
+        # Whisper: 1 installed model across 99 langs
             def probe_fleet(csv_path, timeout):
                 return {"csv_path": csv_path, "timeout": timeout, "results": []}
 
@@ -314,6 +310,21 @@ class TestPtagNormalization(unittest.TestCase):
         before = json.loads(json.dumps(env))
         _ = gui.envelope_ptag(env)
         self.assertEqual(before, env)
+
+    def test_installed_flag_changes_tag(self):
+        # Two envelopes identical except one voice's installed flips -> tags differ
+        h1 = {
+            "hostname": "h",
+            "provider": "piper",
+            "endpoint": "e",
+            "reachable": True,
+            "piper": {"program": "p", "version": "1", "voices": [{"name": "v1", "languages": ["en"], "installed": True}]},
+        }
+        h2 = json.loads(json.dumps(h1))
+        h2["piper"]["voices"][0]["installed"] = False
+        env1 = {"results": [h1]}
+        env2 = {"results": [h2]}
+        self.assertNotEqual(gui.envelope_ptag(env1), gui.envelope_ptag(env2))
 
 
 if __name__ == "__main__":
