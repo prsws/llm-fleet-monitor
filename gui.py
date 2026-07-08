@@ -255,21 +255,21 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
             # Build status cell content preserving existing wording except bold NO
             if reachable:
                 lat = f"{int(latency_ms)} ms" if isinstance(latency_ms, int) else "?"
-                status_html = f"yes ({lat})"
+                status_html = f"&#x2B06; Yes ({lat})"
             else:
                 if err:
                     kind = html_escape(str(err.get("kind")))
                     detail = html_escape(str(err.get("detail") or ""))
                     dash = f" — {detail}" if detail else ""
-                    status_html = f"<strong>NO</strong> — {kind}{dash}"
+                    status_html = f"<strong>&#x2B07; NO</strong> — {kind}{dash}"
                 else:
-                    status_html = "<strong>NO</strong>"
+                    status_html = "<strong>&#x2B07; NO</strong>"
 
             parts.append(
                 "<table class=\"model-table status-table\">"
                 "<tbody>"
-                f"<tr><td><strong>Endpoint</strong></td><td><code>{html_escape(endpoint)}</code> [{html_escape(tag_txt)}]</td></tr>"
-                f"<tr><td>Reachable?</td><td>{status_html}</td></tr>"
+                f"<tr><td><strong>Endpoint</strong></td><td>{html_escape(endpoint)}</td></tr>"
+                f"<tr><td><strong>Up?</strong></td><td>{status_html}</td></tr>"
                 "</tbody></table>"
             )
 
@@ -352,7 +352,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 prog = (w.get("program") or "").strip()
                 ver = (w.get("version") or "").strip()
                 if prog or ver:
-                    parts.append(f"<p><strong>program</strong> {html_escape((prog + ' ' + ver).strip())}</p>")
+                    parts.append(f"<p><strong>Version</strong> {html_escape((prog + ' ' + ver).strip())}</p>")
                 models = w.get("models") or []
                 if models:
                     count_langs = 0
@@ -365,7 +365,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 prog = (p.get("program") or "").strip()
                 ver = (p.get("version") or "").strip()
                 if prog or ver:
-                    parts.append(f"<p><strong>program</strong> {html_escape((prog + ' ' + ver).strip())}</p>")
+                    parts.append(f"<p><strong>Version</strong> {html_escape((prog + ' ' + ver).strip())}</p>")
                 voices = p.get("voices") or []
                 if voices:
                     n = len(voices)

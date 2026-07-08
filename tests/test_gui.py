@@ -105,7 +105,7 @@ class TestGuiRendering(unittest.TestCase):
 
         self.assertIn("&lt;host&gt;", html)
         self.assertIn("A&amp;B", html)
-        self.assertIn("reachable", html)
+        self.assertIn("Up?", html)
         self.assertIn("1.0", html)
 
     def test_render_full_page_contains_fragment_and_polling_route(self):
@@ -171,8 +171,10 @@ class TestGuiProbeWrapper(unittest.TestCase):
         self.assertEqual(result, {"rows": ["row"], "timeout": 1.0})
 
     def test_main_returns_2_when_csv_missing_without_fixture(self):
-        with patch.object(gui, "ThreadingHTTPServer"):
-            code = gui.main(["--csv", "./llm-fleet.csv", "--port", "8766"])
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "nope.csv"
+            with patch.object(gui, "ThreadingHTTPServer"):
+                code = gui.main(["--csv", str(missing), "--port", "8766"])
 
         self.assertEqual(code, 2)
 
