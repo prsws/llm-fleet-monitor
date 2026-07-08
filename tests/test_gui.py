@@ -31,7 +31,7 @@ gui = load_gui_module()
 class TestGuiCache(unittest.TestCase):
     def test_set_and_get_envelope_returns_copy(self):
         env = {
-            "schema_version": 2,
+            "schema_version": 3,
             "probed_at": "now",
             "results": [{"hostname": "host1"}],
         }
@@ -43,8 +43,8 @@ class TestGuiCache(unittest.TestCase):
         self.assertEqual(gui.get_envelope()["results"][0]["hostname"], "host1")
 
     def test_envelope_ptag_is_stable_for_same_results(self):
-        env1 = {"schema_version": 2, "probed_at": "a", "results": [{"hostname": "h"}]}
-        env2 = {"schema_version": 2, "probed_at": "b", "results": [{"hostname": "h"}]}
+        env1 = {"schema_version": 3, "probed_at": "a", "results": [{"hostname": "h"}]}
+        env2 = {"schema_version": 3, "probed_at": "b", "results": [{"hostname": "h"}]}
 
         self.assertEqual(gui.envelope_ptag(env1), gui.envelope_ptag(env2))
 
@@ -79,14 +79,14 @@ class TestGuiHumanizers(unittest.TestCase):
 
 class TestGuiRendering(unittest.TestCase):
     def test_render_cards_fragment_empty_state(self):
-        html = gui.render_cards_fragment({"schema_version": 2, "probed_at": None, "results": []})
+        html = gui.render_cards_fragment({"schema_version": 3, "probed_at": None, "results": []})
 
         self.assertIn('id="host-cards"', html)
         self.assertIn("No hosts to display.", html)
 
     def test_render_cards_fragment_escapes_host_data(self):
         env = {
-            "schema_version": 2,
+            "schema_version": 3,
             "probed_at": "now",
             "results": [
                 {
@@ -109,7 +109,7 @@ class TestGuiRendering(unittest.TestCase):
         self.assertIn("1.0", html)
 
     def test_render_full_page_contains_fragment_and_polling_route(self):
-        html = gui.render_full_page({"schema_version": 2, "probed_at": None, "results": []})
+        html = gui.render_full_page({"schema_version": 3, "probed_at": None, "results": []})
 
         self.assertIn("LLM Fleet Monitor", html)
         self.assertIn('hx-get="/fragment/hosts"', html)
@@ -117,7 +117,7 @@ class TestGuiRendering(unittest.TestCase):
 
     def test_render_details_have_stable_ids_with_slugified_hostname(self):
         env = {
-            "schema_version": 2,
+            "schema_version": 3,
             "probed_at": "now",
             "results": [
                 {
@@ -142,6 +142,40 @@ class TestGuiRendering(unittest.TestCase):
         # slug("GPU Box #1") -> "gpu-box-1"
         self.assertIn('id="ld-gpu-box-1"', html)
         self.assertIn('id="dl-gpu-box-1"', html)
+
+    def test_render_cards_fragment_openai_provider(self):
+        env = {
+            "schema_version": 3,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "llamabox",
+                    "description": "llama.cpp on the NUC",
+                    "provider": "openai",
+                    "endpoint": "192.168.1.40:8080",
+                    "reachable": True,
+                    "latency_ms": 25,
+                    "openai": {
+                        "server": "llama.cpp",
+                        "models": [
+                            {"id": "qwen2.5-coder-14b", "owned_by": None},
+                            {"id": "gemma-2-9b", "owned_by": "google"},
+                        ],
+                    },
+                }
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+
+        self.assertIn("llamabox", html)
+        self.assertIn("llama.cpp", html)
+        self.assertIn("Available models (v1)", html)
+        self.assertIn("2", html)
+        self.assertIn("qwen2.5-coder-14b", html)
+        self.assertIn("gemma-2-9b", html)
+        self.assertIn("google", html)
+        self.assertIn('id="oa-llamabox"', html)
 
 
 class TestGuiProbeWrapper(unittest.TestCase):

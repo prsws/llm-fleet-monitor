@@ -70,7 +70,7 @@ def import_probe_module(path: Path):
 # ------------------------- Cache -------------------------
 
 _cache_lock = threading.RLock()
-_cached_envelope: Dict[str, Any] = {"schema_version": 2, "probed_at": None, "results": []}
+_cached_envelope: Dict[str, Any] = {"schema_version": 3, "probed_at": None, "results": []}
 
 
 def set_envelope(env: Dict[str, Any]) -> None:
@@ -233,6 +233,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 "ollama": "ollama.png",
                 "whisper": "Whisper.png",
                 "piper": "Piper.png",
+                "openai": "OpenAI.png",
             }.get(provider or "")
 
             # Pico.css-friendly header with a small icon next to the title
@@ -376,6 +377,34 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                                 lang_set.add(lg)
                     m = len(lang_set)
                     parts.append(f"<p>{n} voices across {m} langs</p>")
+
+            elif reachable and provider == "openai" and rec.get("openai"):
+                o = rec["openai"] or {}
+                server = (o.get("server") or "").strip()
+                if server:
+                    parts.append(f"<p><strong>Server</strong> {html_escape(server)}</p>")
+                models = o.get("models") or []
+                if models:
+                    # Accordion with hx-preserve
+                    parts.append(
+                        f"<details id=\"oa-{slug}\" hx-preserve><summary><strong>Available models (v1)</strong>: {len(models)}</summary>"
+                    )
+                    for m in models:
+                        model_id = html_escape(str(m.get("id") or "?"))
+                        owned_by = m.get("owned_by")
+                        # Build table rows
+                        rows: List[str] = [f"<tr><td colspan=\"2\"><code>{model_id}</code></td></tr>"]
+                        if owned_by:
+                            rows.append(f"<tr><td>owned_by</td><td>{html_escape(str(owned_by))}</td></tr>")
+                        parts.append(
+                            "<table class=\"model-table\">"
+                            "<tbody>"
+                            + "".join(rows) +
+                            "</tbody></table>"
+                        )
+                    parts.append("</details>")
+                else:
+                    parts.append(f"<p><strong>Available models (v1)</strong>: 0</p>")
 
             parts.append("</article>")
 
@@ -566,7 +595,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 env = json.load(f)
         except FileNotFoundError:
             # Graceful fallback if sample.json is absent
-            env = {"schema_version": 2, "probed_at": None, "results": []}
+            env = {"schema_version": 3, "probed_at": None, "results": []}
         set_envelope(env)
         mod = None
     else:
@@ -587,7 +616,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         except Exception as e:
             # Don't crash the server on initial failure; show zero-state page
             sys.stderr.write(f"initial probe failed: {e}\n")
-            set_envelope({"schema_version": 2, "probed_at": None, "results": []})
+            set_envelope({"schema_version": 3, "probed_at": None, "results": []})
 
     # Start background refresher if not in fixture mode
     stop_evt = threading.Event()

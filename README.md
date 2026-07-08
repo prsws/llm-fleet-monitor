@@ -6,7 +6,8 @@ Point it at a list of hosts and it reports, per host:
 
 - **Ollama** — version, currently-loaded models with their keep-alive countdown and GPU-vs-CPU residency (it flags models that have *spilled* to CPU), and the downloaded-model inventory.
 - **Whisper / Piper** (Wyoming protocol speech services) — program, version, and a summary of available models / voices and languages.
-- **Reachability** — up, idle, or unreachable (with a classified reason: timeout, refused, DNS, protocol).
+- **OpenAI-compatible runners** (e.g. llama.cpp with `/v1/models` endpoint) — server, available model inventory (liveness + inventory only; no loaded/idle, TTL, or VRAM data for this provider — use the native `ollama` flag for full Ollama host metrics).
+- **Reachability** — up, idle, or unreachable (with a classified reason: timeout, refused, DNS, protocol, auth).
 
 It ships as two pieces:
 
@@ -51,10 +52,11 @@ python3 gui.py
 Both tools read a CSV with a header row. **One row = one endpoint = one service.**
 
 ```csv
-sort,hostname,description,endpoint,ollama,whisper,piper
-10,gpu-box,"Main Ollama box",192.168.1.20:11434,true,false,false
-20,voice-stt,"Whisper speech-to-text",192.168.1.30:10300,false,true,false
-30,voice-tts,"Piper text-to-speech",192.168.1.30:10200,false,false,true
+sort,hostname,description,endpoint,ollama,whisper,piper,openai
+10,gpu-box,"Main Ollama box",192.168.1.20:11434,true,false,false,false
+20,voice-stt,"Whisper speech-to-text",192.168.1.30:10300,false,true,false,false
+30,voice-tts,"Piper text-to-speech",192.168.1.30:10200,false,false,true,false
+40,llamabox,"llama.cpp endpoint",192.168.1.40:8080,false,false,false,true
 ```
 
 | Column        | Meaning                                                                 |
@@ -66,11 +68,13 @@ sort,hostname,description,endpoint,ollama,whisper,piper
 | `ollama`      | `true`/`false` — probe this endpoint as Ollama.                         |
 | `whisper`     | `true`/`false` — probe this endpoint as a Wyoming Whisper service.      |
 | `piper`       | `true`/`false` — probe this endpoint as a Wyoming Piper service.        |
+| `openai`      | `true`/`false` — probe this endpoint as OpenAI-compatible (e.g., llama.cpp `/v1/models`). |
 
 Rules:
 
 - `sort` is required and must be an integer. Rows with a missing or non-integer `sort` are skipped with a warning.
-- **Exactly one** of `ollama` / `whisper` / `piper` must be `true` per row — that selects how the endpoint is probed. (A single `host:port` addresses one service, so a row with zero or several flags set is skipped with a warning.)
+- `openai` column is required as of schema version 3. Existing host lists must add it (all-false is fine); a CSV without it is rejected at startup with exit code 2.
+- **Exactly one** of `ollama` / `whisper` / `piper` / `openai` must be `true` per row — that selects how the endpoint is probed. (A single `host:port` addresses one service, so a row with zero or several flags set is skipped with a warning.)
 - Booleans are case-insensitive; `true/t/1/yes/y` are truthy, everything else is false.
 
 > **Heads up — don't commit your real host list.** A populated `llm-fleet.csv` is a map of your internal network (IPs, hostnames, which boxes run inference). Keep it out of version control. Ship/commit only a sanitized `example.llm-fleet.csv` with dummy values, and add `llm-fleet.csv` to your `.gitignore`.
@@ -87,8 +91,8 @@ python3 llm-fleet-monitor.py HOSTS_CSV [--timeout SECONDS] [--json] [--verbose] 
 |--------------------------|-----------------------------------------------------------------------------------------|
 | `HOSTS_CSV`              | Path to the host-list CSV (required).                                                    |
 | `--timeout SECONDS`      | Per-endpoint connect+read timeout. Default `3.0`.                                        |
-| `--json`                 | Emit the JSON envelope (`schema_version: 2`) to stdout instead of text. Ignores `--verbose`. |
-| `--verbose`              | Text mode only: expand the full Whisper/Piper model & voice lists instead of a count.   |
+| `--json`                 | Emit the JSON envelope (`schema_version: 3`) to stdout instead of text. Ignores `--verbose`. |
+| `--verbose`              | Text mode only: expand the full Whisper/Piper/OpenAI model lists instead of a count.    |
 | `--fail-on-unreachable`  | Exit with code `1` if any endpoint was unreachable (useful for cron / monitoring).      |
 
 The probe runs all endpoints **concurrently**, with a per-endpoint timeout, and one dead host never aborts the sweep — unreachable hosts are reported, not fatal.
@@ -124,7 +128,9 @@ voice-stt — Whisper speech-to-text
 
 ### JSON output
 
-`--json` prints a single envelope: `{ "schema_version": 2, "probed_at": "...", "results": [ ... ] }`. This is the stable, machine-readable contract — point dashboards or monitoring at it. The schema is versioned; fields are added, never silently renamed.
+`--json` prints a single envelope: `{ "schema_version": 3, "probed_at": "...", "results": [ ... ] }`. This is the stable, machine-readable contract — point dashboards or monitoring at it. The schema is versioned; fields are added, never silently renamed.
+
+**Schema version 3** (current): adds the `openai` provider block and `auth` error kind. Every record carries all four provider keys (`ollama`, `whisper`, `piper`, `openai`), with exactly one non-null per row (matching the `provider` field). OpenAI-compatible endpoints report only inventory and server info; see the provider list above for limitations.
 
 ---
 
@@ -156,6 +162,7 @@ How it works: a background thread re-runs the probe every 10 seconds and caches 
 
 - **Ollama** is queried over its HTTP API (`/api/version`, `/api/ps`, `/api/tags`) — no SSH, no agent on the host.
 - **Whisper / Piper** are queried over the **Wyoming protocol** (TCP) using its `describe`→`info` handshake — the tool asks the service to describe itself and reads back program, version, and available models/voices. No audio is sent.
+- **OpenAI-compatible runners** are queried over HTTP at `GET /v1/models` — read-only inventory check. No API key support; endpoints that require authentication report an `auth` error.
 
 Everything is read-only network probing. The tool never writes to or changes the hosts it monitors.
 
