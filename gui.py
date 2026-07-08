@@ -320,26 +320,25 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # adding the `hx-preserve` attribute keeps the existing element instance.
 #                    parts.append(f"<hr />")
                     parts.append(f"<details id=\"dl-{slug}\" hx-preserve><summary><span class=\"property-name indent-span\">Downloaded models (ls):</span> <span class=\"property-value\">{len(inv)}</span></summary>")
-
                     for m in inv:
                         nm = html_escape(str(m.get("name") or "?"))
                         # Build rows conditionally; size is always present in downloaded entries
                         rows: List[str] = []
                         param = m.get("parameter_size")
                         if isinstance(param, str) and param.strip():
-                            rows.append(f"<tr><td>Parameters</td><td>{html_escape(param.strip())}</td></tr>")
+                            rows.append(f"<tr><td class=\"property-name\">&#127898;&#65039; Parameters</td><td class=\"property-value\">{html_escape(param.strip())}</td></tr>")
                         quant = m.get("quantization")
                         if isinstance(quant, str) and quant.strip():
-                            rows.append(f"<tr><td>Quantization</td><td>{html_escape(quant.strip())}</td></tr>")
+                            rows.append(f"<tr><td class=\"property-name\">&lfloor; &#9859; &rfloor; Quantization</td><td class=\"property-value\">{html_escape(quant.strip())}</td></tr>")
                         fam = m.get("family")
                         if isinstance(fam, str) and fam.strip():
-                            rows.append(f"<tr><td>Family</td><td>{html_escape(fam.strip())}</td></tr>")
+                            rows.append(f"<tr><td class=\"property-name\">&#128106; Family</td><td class=\"property-value\">{html_escape(fam.strip())}</td></tr>")
                         size_h = human_size(m.get("size"))
-                        rows.append(f"<tr><td>Size</td><td>{size_h}</td></tr>")
+                        rows.append(f"<tr><td class=\"property-name\">&#128207; Size</td><td class=\"property-value\">{size_h}</td></tr>")
 
                         parts.append(
                             "<table class=\"model-table\">"
-                            f"<thead><tr><th colspan=\"2\"><code>{nm}</code></th></tr></thead>"
+                            f"<thead><tr><th colspan=\"2\" class=\"property-name-alt2\">{nm}</th></tr></thead>"
                             "<tbody>"
                             + "".join(rows) +
                             "</tbody></table>"
@@ -393,7 +392,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         model_id = html_escape(str(m.get("id") or "?"))
                         owned_by = m.get("owned_by")
                         # Build table rows
-                        rows: List[str] = [f"<tr><td colspan=\"2\"><code>{model_id}</code></td></tr>"]
+                        rows: List[str] = [f"<tr><td colspan=\"2\" class=\"property-name-alt\">{model_id}</td></tr>"]
                         if owned_by:
                             rows.append(f"<tr><td>owned_by</td><td>{html_escape(str(owned_by))}</td></tr>")
                         parts.append(
