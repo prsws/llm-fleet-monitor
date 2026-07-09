@@ -1,7 +1,10 @@
 sort,hostname,description,endpoint,ollama,whisper,piper,openai
+5,mmm4,rapid-mlx OpenAI - Mac mini M4 24GB,192.168.10.3:8000,false,false,false,true
 10,mmm4,Ollama - Mac mini M4 24GB,192.168.10.3:11434,true,false,false,false
-20,mmm4,Wyoming whisper-large-v3 STT - Mac mini M4,192.168.10.3:10300,false,true,false,false
-30,mmm4,Wyoming piper TTS -  Mac mini M4,192.168.10.3:10200,false,false,true,false
-40,pepews4,Ollama -  Dell G7 7700 i7-10750 32GB RTX2070 Super 8GB VRAM,192.168.10.2:11434,true,false,false,false
-50,macstudio,Ollama -  Mac Studio M1 Ultra 64GB,192.168.10.5:11434,true,false,false,false
-50,macstudio, OpenAI-compatible - Mac Studio M1 Ultra 64GB via Ollama,192.168.10.5:11434,false,false,false,true
+20,macstudio,Ollama -  Mac Studio M1 Ultra 64GB,192.168.10.5:11434,true,false,false,false
+25,macstudio, OpenAI -  Mac Studio M1 Ultra 64GB,192.168.10.5:8000,false,false,false,true
+30,pepews4,Ollama -  Dell G7 7700 i7-10750 32GB RTX2070 Super 8GB VRAM,192.168.10.2:11434,true,false,false,false
+40,macstudio, OpenAI-compatible - Mac Studio M1 Ultra 64GB via Ollama,192.168.10.5:11434,false,false,false,true
+50,mmm4,Wyoming whisper-large-v3 STT - Mac mini M4,192.168.10.3:10300,false,true,false,false
+60,mmm4,Wyoming piper TTS -  Mac mini M4,192.168.10.3:10200,false,false,true,false
+
