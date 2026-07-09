@@ -326,10 +326,10 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         rows: List[str] = []
                         param = m.get("parameter_size")
                         if isinstance(param, str) and param.strip():
-                            rows.append(f"<tr><td class=\"property-name\">&#127898;&#65039; Parameters</td><td class=\"property-value\">{html_escape(param.strip())}</td></tr>")
+                            rows.append(f"<tr><td class=\"property-name\">&#127947; Parameters</td><td class=\"property-value\">{html_escape(param.strip())}</td></tr>")
                         quant = m.get("quantization")
                         if isinstance(quant, str) and quant.strip():
-                            rows.append(f"<tr><td class=\"property-name\">&lfloor; &#9859; &rfloor; Quantization</td><td class=\"property-value\">{html_escape(quant.strip())}</td></tr>")
+                            rows.append(f"<tr><td class=\"property-name\">&#128125; Quantization</td><td class=\"property-value\">{html_escape(quant.strip())}</td></tr>")
                         fam = m.get("family")
                         if isinstance(fam, str) and fam.strip():
                             rows.append(f"<tr><td class=\"property-name\">&#128106; Family</td><td class=\"property-value\">{html_escape(fam.strip())}</td></tr>")

@@ -120,9 +120,9 @@ If you need to view the dashboard from another workstation, prefer an SSH tunnel
 ```
 ssh -L 8766:127.0.0.1:8766 root@<lxc-ip>
 ```
-Then open http://127.0.0.1:8766 on your workstation. **Not Tested** 
+Then open http://127.0.0.1:8766 on your workstation.
 
-_If you want to expose the dashboard publicly, edit gui.py and change its default host to 0.0.0.0. You can also change the port._ **Tested Ok**
+_If you want to expose the dashboard publicly, edit gui.py and change its default host to 0.0.0.0. You can also change the port._
 
 
 ## 10. Create a systemd Service for the Dashboard
@@ -163,7 +163,7 @@ Review logs with:
 journalctl -u llm-fleet-dashboard.service -f
 ```
 
-## 11. Optional: Cron-Friendly CLI Monitoring **Not Tested**
+## 11. Optional: Cron-Friendly CLI Monitoring
 If you want a simple scheduled health check, create a wrapper script that exits non-zero when any endpoint is unreachable.
 ```
 cat > /usr/local/bin/llm-fleet-check <<'EOF'
@@ -226,10 +226,11 @@ Before updating, copy or commit any local changes outside the private CSV. Do no
 ## 16. Running Tests
 
 ```
-cd tests
-python3 -m unittest llm_fleet_monitor_tests.py
-python3 -m unittest gui_tests.py
+cd /opt/llm-fleet-monitor
+python3 -m unittest
 ```
+
+Tests discover automatically via `tests/test_*.py` pattern. Expect a nonzero test count in the output (e.g., "Ran 23 tests").
 
 ## 17. Troubleshooting
 
