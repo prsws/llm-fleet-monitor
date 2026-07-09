@@ -10,8 +10,9 @@ Big picture
 - Two components, pure Python standard library, NO build step, no pip installs:
   - Probe CLI: `llm-fleet-monitor.py` — reads a CSV of hosts, probes providers
     concurrently (Ollama over HTTP; Whisper/Piper over the Wyoming TCP
-    protocol), normalizes results into a versioned JSON envelope, renders text
-    or JSON.
+    protocol; OpenAI-compatible runners, e.g. llama.cpp, over HTTP
+    `/v1/models`), normalizes results into a versioned JSON envelope, renders
+    text or JSON.
   - Web GUI: `gui.py` — stdlib `ThreadingHTTPServer`. A background thread
     re-runs the probe every REFRESH_SECONDS and caches the envelope; HTTP
     handlers only read the cache. Renders server-side HTML fragments swapped
@@ -36,10 +37,11 @@ Hard fences — read before editing anything
 Key files and entrypoints
 - `llm-fleet-monitor.py`
   - `read_rows(csv_path)` — CSV validation. Required columns:
-    `sort,hostname,description,endpoint,ollama,whisper,piper` (verify the
-    `required` list in code — it grows when providers are added). Exactly one
-    provider flag true per row; `sort` must be an integer; invalid rows warn
-    and skip; missing columns are a startup error (exit 2).
+    `sort,hostname,description,endpoint,ollama,whisper,piper,openai` (verify
+    the `required` list in code — it grows when providers are added).
+    Exactly one provider flag true per row; `sort` must be an integer;
+    invalid rows warn and skip; missing columns (including a CSV that
+    predates the `openai` column, schema v3+) are a startup error (exit 2).
   - `build_record(row)` — maps provider → probe function. New providers plug
     in here plus a `probe_{provider}` helper returning the same tuple shape.
   - `probe_ollama` — GET `/api/version`, then `/api/ps` and `/api/tags`.
@@ -101,4 +103,3 @@ References
 - Provider probes: `llm-fleet-monitor.py` (probe_ollama, probe_wyoming)
 - GUI swap/ptag behavior: `gui.py` (envelope_ptag, render_cards_fragment)
 - Tests: `tests/test_llm_fleet_monitor.py`, `tests/test_gui.py`
-- 

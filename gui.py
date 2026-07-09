@@ -224,7 +224,26 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
             reachable = bool(rec.get("reachable"))
             latency_ms = rec.get("latency_ms")
             err = rec.get("error") or None
-            slug = _slugify(str(hostname))
+            # id/data-count identity is keyed on (endpoint, provider), never
+            # hostname. hostname is a free-text, user-configurable display
+            # label (no format constraints, no uniqueness guarantee). sort
+            # is a separate, orthogonal concern (display order only, not
+            # identity — see run_probe()'s (sort, endpoint) tiebreak) and
+            # never belongs here either.
+            #
+            # endpoint ALONE isn't quite enough: Ollama serves both its
+            # native API and an OpenAI-compatible /v1/models shim on the
+            # SAME port, so a fleet can legitimately have two rows — one
+            # ollama, one openai — pointed at the identical host:port (this
+            # is real, not hypothetical: example.llm-fleet.csv probes
+            # 192.168.10.5:11434 as both). ld-/dl-/oa- already avoid that
+            # collision incidentally, since each is only ever emitted for
+            # its own provider's block — but status-{slug} is rendered for
+            # every row regardless of provider, so it needs the extra
+            # disambiguation. Folding provider into the one shared slug
+            # keeps all four id prefixes under a single, simple rule
+            # instead of two different ones.
+            slug = _slugify(f"{endpoint}-{provider}")
 
             parts.append("<article>")
             # Header (split hostname and description into two lines within header)
@@ -266,11 +285,20 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 else:
                     status_html = "<strong>&#x2B07; NO</strong>"
 
+            # Stable, copy-independent state markers for tests/CSS/future JS.
+            # These ride alongside status_html rather than replacing it — the
+            # visible wording/emoji there is UI copy in flux and shouldn't be
+            # what anything (tests included) keys off of.
+            status_attrs = f' id="status-{slug}" data-reachable="{"true" if reachable else "false"}"'
+            if not reachable and err:
+                status_attrs += f' data-error-kind="{html_escape(str(err.get("kind")))}"'
+
             parts.append(
                 "<table class=\"model-table status-table\">"
                 "<thead><tr><th class=\"property-name\">Endpoint</th><th class=\"property-name\">Status</th></tr></thead>"
                 "<tbody>"
-                f"<tr><td class=\"property-value\">{html_escape(endpoint)}</td><td class=\"property-value\">{status_html}</td></tr>"
+                f"<tr><td class=\"property-value\">{html_escape(endpoint)}</td>"
+                f"<td class=\"property-value\"{status_attrs}>{status_html}</td></tr>"
                 "</tbody></table>"
             )
 
@@ -288,7 +316,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # Per htmx 4 beta5 docs (see /docs.md under "Swapping" and Idiomorph),
                     # using the morph swap allows attribute-preserving matching by id.
                     parts.append(f"<br />")
-                    parts.append(f"<details id=\"ld-{slug}\" open><summary><span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">{len(loaded)}</span></summary>")
+                    parts.append(f"<details id=\"ld-{slug}\" data-count=\"{len(loaded)}\" open><summary><span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">{len(loaded)}</span></summary>")
                     for m in loaded:
                         name = html_escape(str(m.get("name") or "?"))
                         size = human_size(m.get("size"))
@@ -309,7 +337,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         )
                     parts.append("</details>")
                 else:
-                    parts.append("<div><span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">&#x2B06; Up, nothing running</span></div>")
+                    parts.append(f"<div id=\"ld-{slug}\" data-count=\"0\"><span class=\"property-name indent-span\">Running models (ps):</span> <span class=\"property-value\">&#x2B06; Up, nothing running</span></div>")
 
                 inv = o.get("downloaded") or []
                 # Consolidate downloaded count into the accordion header. When empty, show a plain line.
@@ -319,7 +347,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                     # Per htmx 4 beta5 docs (/docs.md "Preserving Elements Across Swaps"),
                     # adding the `hx-preserve` attribute keeps the existing element instance.
 #                    parts.append(f"<hr />")
-                    parts.append(f"<details id=\"dl-{slug}\" hx-preserve><summary><span class=\"property-name indent-span\">Downloaded models (ls):</span> <span class=\"property-value\">{len(inv)}</span></summary>")
+                    parts.append(f"<details id=\"dl-{slug}\" data-count=\"{len(inv)}\" hx-preserve><summary><span class=\"property-name indent-span\">Downloaded models (ls):</span> <span class=\"property-value\">{len(inv)}</span></summary>")
                     for m in inv:
                         nm = html_escape(str(m.get("name") or "?"))
                         # Build rows conditionally; size is always present in downloaded entries
@@ -345,7 +373,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         )
                     parts.append("</details>")
                 else:
-                    parts.append("<p><strong>Downloaded models</strong> (ls): 0</p>")
+                    parts.append(f"<p id=\"dl-{slug}\" data-count=\"0\"><strong>Downloaded models</strong> (ls): 0</p>")
 
             elif reachable and provider == "whisper" and rec.get("whisper"):
                 w = rec["whisper"] or {}
@@ -383,10 +411,15 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 if server:
                     parts.append(f"<p><strong>Server</strong> {html_escape(server)}</p>")
                 models = o.get("models") or []
+                # Same id (and a data-count) in both branches below — the two
+                # branches use different display copy ("Downloaded" vs
+                # "Available") for the same concept, so anything identifying
+                # this block (tests, hx-preserve targeting, future JS) should
+                # key off id/data-count, not the wording.
                 if models:
                     # Accordion with hx-preserve
                     parts.append(
-                        f"<details id=\"oa-{slug}\" hx-preserve><summary><strong>Downloaded models</strong> (v1): {len(models)}</summary>"
+                        f"<details id=\"oa-{slug}\" data-count=\"{len(models)}\" hx-preserve><summary><strong>Downloaded models</strong> (v1): {len(models)}</summary>"
                     )
                     for m in models:
                         model_id = html_escape(str(m.get("id") or "?"))
@@ -403,7 +436,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                         )
                     parts.append("</details>")
                 else:
-                    parts.append(f"<p><strong>Available models (v1)</strong>: 0</p>")
+                    parts.append(f"<p id=\"oa-{slug}\" data-count=\"0\"><strong>Available models (v1)</strong>: 0</p>")
 
             parts.append("</article>")
 

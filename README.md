@@ -61,8 +61,8 @@ sort,hostname,description,endpoint,ollama,whisper,piper,openai
 
 | Column        | Meaning                                                                 |
 |---------------|-------------------------------------------------------------------------|
-| `sort`        | Integer display/order key. Required, must not be empty. Rows are ordered by `sort`; ties are broken by `hostname`. |
-| `hostname`    | A label for the row (shown in the report).                              |
+| `sort`        | Integer display/order key. Required, must not be empty. Rows are ordered by `sort`; ties are broken by `endpoint`. |
+| `hostname`    | A free-text label for the row (shown in the report). Not used for ordering or uniqueness — see `sort` and `endpoint`. |
 | `description` | A short sentence describing the check. Quote it if it contains commas.  |
 | `endpoint`    | `host:port` for this one service. Host may be an IP or DNS name; the port is required. |
 | `ollama`      | `true`/`false` — probe this endpoint as Ollama.                         |
@@ -88,7 +88,7 @@ python3 llm-fleet-monitor.py HOSTS_CSV [--timeout SECONDS] [--json] [--verbose] 
 ```
 
 | Flag                     | Effect                                                                                  |
-|--------------------------|-----------------------------------------------------------------------------------------|
+|--------------------------|-------------------------------------------------------------------------------------------|
 | `HOSTS_CSV`              | Path to the host-list CSV (required).                                                    |
 | `--timeout SECONDS`      | Per-endpoint connect+read timeout. Default `3.0`.                                        |
 | `--json`                 | Emit the JSON envelope (`schema_version: 3`) to stdout instead of text. Ignores `--verbose`. |
@@ -141,7 +141,7 @@ python3 gui.py [--fixture] [--csv PATH] [--port N]
 ```
 
 | Flag           | Effect                                                                          |
-|----------------|---------------------------------------------------------------------------------|
+|----------------|-----------------------------------------------------------------------------------|
 | `--fixture`    | Serve a captured `sample.json` instead of probing live hosts (handy for trying the UI, or development with no hosts up). |
 | `--csv PATH`   | Use a specific host list. Default: `llm-fleet.csv` next to the script.           |
 | `--port N`     | Port to bind. Default `8766`.                                                    |

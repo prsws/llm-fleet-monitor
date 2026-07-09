@@ -103,6 +103,17 @@ def classify_error(exc: BaseException) -> Tuple[str, str]:
         return "other", str(exc)
     if isinstance(exc, json.JSONDecodeError):
         return "protocol", str(exc)
+    if isinstance(exc, ConnectionError):
+        # The TCP connection succeeded but the peer dropped mid-exchange —
+        # e.g. wyoming_describe() raises a bare ConnectionError when the
+        # socket closes before a full describe/info message arrives.
+        # ConnectionRefusedError (never connected) is handled above and
+        # keeps its "refused" classification; everything else in the
+        # ConnectionError family lands here as a protocol-level failure,
+        # since the connection itself was established. This is the sole
+        # home for that case now — probe_wyoming no longer re-classifies
+        # it locally.
+        return "protocol", str(exc)
     return "other", str(exc)
 
 
@@ -311,11 +322,12 @@ def probe_wyoming(host: str, port: int, timeout: float, kind: str) -> Tuple[bool
         else:
             return True, latency_ms, {"note": "unknown kind"}, None
     except Exception as e:
-        # If TCP connects but no/garbage info, classify as protocol
+        # classify_error() is the single source of truth for error kind here
+        # now — no wyoming-specific override. ConnectionRefusedError (never
+        # connected) -> "refused"; a bare ConnectionError (handshake dropped
+        # mid-exchange, raised by wyoming_describe above) -> "protocol".
+        # Both are handled inside classify_error() itself.
         kind_s, detail = classify_error(e)
-        if isinstance(e, (json.JSONDecodeError, ConnectionError)) or kind_s == "other":
-            # ambiguous — call it protocol
-            return False, None, None, {"kind": "protocol", "detail": str(e)}
         return False, None, None, {"kind": kind_s, "detail": detail}
 
 
@@ -483,8 +495,11 @@ def run_probe(rows: List[Row], timeout: float, max_workers: int = 16) -> Dict[st
                     "openai": None,
                 }
             results.append(rec)
-    # Sort results deterministically by (sort, str(sort)+hostname)
-    results.sort(key=lambda rec: (rec.get("sort", 0), f"{rec.get('sort', 0)}{rec.get('hostname') or ''}"))
+    # Sort results deterministically by (sort, endpoint). endpoint, not
+    # hostname, is the actual per-row unique key (README: "one row = one
+    # endpoint = one service") — hostname is just a display label and is
+    # expected to repeat across rows for the same physical box.
+    results.sort(key=lambda rec: (rec.get("sort", 0), rec.get("endpoint") or ""))
     # Phase 2A: add stable top-level schema version for machine-consumable output
     return {"schema_version": 3, "probed_at": probed_at, "results": results}
 

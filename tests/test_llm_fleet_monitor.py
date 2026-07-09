@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import importlib.util
 import json
+import socket
 import tempfile
 import unittest
 from pathlib import Path
@@ -304,19 +305,27 @@ class TestLlmFleetMonitorSorting(unittest.TestCase):
 
         self.assertEqual([r["sort"] for r in env["results"]], [10, 20, 30])
 
-    def test_run_probe_breaks_sort_ties_by_sort_plus_hostname(self):
+    def test_run_probe_breaks_sort_ties_by_endpoint(self):
+        # Hostnames deliberately sort the OPPOSITE way from endpoints
+        # ("a-host" before "z-host" alphabetically, but its endpoint
+        # 127.0.0.1:2 is lexically greater than 127.0.0.1:1). If the
+        # tiebreak ever regresses to hostname, this assertion order flips
+        # and the test fails.
         rows = [
-            monitor.Row(10, "zzz", "d", "127.0.0.1:1", "ollama"),
-            monitor.Row(10, "aaa", "d", "127.0.0.1:1", "ollama"),
+            monitor.Row(10, "a-host", "d", "127.0.0.1:2", "ollama"),
+            monitor.Row(10, "z-host", "d", "127.0.0.1:1", "ollama"),
         ]
 
         def fake_build_record(row, timeout):
-            return {"sort": row.sort, "hostname": row.hostname}
+            return {"sort": row.sort, "hostname": row.hostname, "endpoint": row.endpoint}
 
         with patch.object(monitor, "build_record", side_effect=fake_build_record):
             env = monitor.run_probe(rows, timeout=1.0)
 
-        self.assertEqual([r["hostname"] for r in env["results"]], ["aaa", "zzz"])
+        self.assertEqual(
+            [r["endpoint"] for r in env["results"]], ["127.0.0.1:1", "127.0.0.1:2"]
+        )
+        self.assertEqual([r["hostname"] for r in env["results"]], ["z-host", "a-host"])
 
     def test_run_probe_schema_version_is_3(self):
         rows = [monitor.Row(10, "a", "d", "127.0.0.1:1", "ollama")]
@@ -328,6 +337,76 @@ class TestLlmFleetMonitorSorting(unittest.TestCase):
             env = monitor.run_probe(rows, timeout=1.0)
 
         self.assertEqual(env["schema_version"], 3)
+
+
+class TestClassifyError(unittest.TestCase):
+    # Regression coverage for the refused-vs-protocol misclassification fix:
+    # probe_wyoming() used to re-classify anything isinstance(e, ConnectionError)
+    # as "protocol", which silently swallowed classify_error()'s correct
+    # ConnectionRefusedError -> "refused" result (ConnectionRefusedError is a
+    # ConnectionError subclass). The override is gone now; classify_error()
+    # is the sole source of truth. These pin its behavior directly.
+
+    def test_connection_refused_is_refused(self):
+        kind, _ = monitor.classify_error(ConnectionRefusedError("refused"))
+        self.assertEqual(kind, "refused")
+
+    def test_bare_connection_error_is_protocol(self):
+        # This is what wyoming_describe() raises when the socket closes
+        # before a full describe/info message arrives (see
+        # "closed before info" / "closed mid-event" in wyoming_describe).
+        kind, _ = monitor.classify_error(ConnectionError("closed before info"))
+        self.assertEqual(kind, "protocol")
+
+    def test_connection_reset_is_protocol(self):
+        # ConnectionResetError/BrokenPipeError/ConnectionAbortedError are
+        # ConnectionError subclasses that aren't ConnectionRefusedError.
+        # Previously unclassified ("other"); now fall in with the bare
+        # ConnectionError case above as a side effect of the fix.
+        kind, _ = monitor.classify_error(ConnectionResetError("reset"))
+        self.assertEqual(kind, "protocol")
+
+    def test_timeout_and_dns_unaffected(self):
+        self.assertEqual(monitor.classify_error(socket.timeout("timed out"))[0], "timeout")
+        self.assertEqual(monitor.classify_error(socket.gaierror("no such host"))[0], "dns")
+
+
+class TestProbeWyoming(unittest.TestCase):
+    # probe_wyoming() itself, not just classify_error() — proves the local
+    # override is actually gone and errors pass through unmodified.
+
+    def test_connection_refused_reports_refused(self):
+        with patch.object(monitor, "wyoming_describe", side_effect=ConnectionRefusedError("refused")):
+            ok, latency, data, err = monitor.probe_wyoming("127.0.0.1", 10300, 1.0, "whisper")
+
+        self.assertFalse(ok)
+        self.assertIsNone(latency)
+        self.assertIsNone(data)
+        self.assertEqual(err["kind"], "refused")
+
+    def test_dropped_handshake_reports_protocol(self):
+        with patch.object(monitor, "wyoming_describe", side_effect=ConnectionError("closed before info")):
+            ok, latency, data, err = monitor.probe_wyoming("127.0.0.1", 10300, 1.0, "whisper")
+
+        self.assertFalse(ok)
+        self.assertEqual(err["kind"], "protocol")
+
+    def test_no_local_override_delegates_entirely_to_classify_error(self):
+        # The bug itself, reproduced directly: before the fix, every one of
+        # these except timeout/dns collapsed to "protocol" regardless of
+        # what classify_error() actually said.
+        cases = [
+            (ConnectionRefusedError("x"), "refused"),
+            (socket.timeout("x"), "timeout"),
+            (socket.gaierror("x"), "dns"),
+            (ConnectionError("x"), "protocol"),
+        ]
+        for exc, expected_kind in cases:
+            with self.subTest(exc=type(exc).__name__):
+                with patch.object(monitor, "wyoming_describe", side_effect=exc):
+                    ok, _latency, _data, err = monitor.probe_wyoming("127.0.0.1", 10300, 1.0, "piper")
+                self.assertFalse(ok)
+                self.assertEqual(err["kind"], expected_kind)
 
 
 if __name__ == "__main__":

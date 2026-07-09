@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -105,8 +106,39 @@ class TestGuiRendering(unittest.TestCase):
 
         self.assertIn("&lt;host&gt;", html)
         self.assertIn("A&amp;B", html)
-        self.assertIn("Up?", html)
+        # Reachability state is asserted via the stable id/data-reachable
+        # marker, not display copy — the visible wording (was "Up?", now
+        # mid-migration to an emoji treatment) is UI copy in flux and isn't
+        # what this test should be pinned to. id is keyed on (endpoint,
+        # provider), not the (deliberately unusual/untrusted) "<host>"
+        # hostname in this fixture.
+        self.assertIn('id="status-127-0-0-1-11434-ollama"', html)
+        self.assertIn('data-reachable="true"', html)
         self.assertIn("1.0", html)
+
+    def test_render_cards_fragment_unreachable_state(self):
+        env = {
+            "schema_version": 3,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "gpu-box",
+                    "description": "",
+                    "provider": "ollama",
+                    "endpoint": "127.0.0.1:11434",
+                    "reachable": False,
+                    "latency_ms": None,
+                    "error": {"kind": "timeout", "detail": "timed out"},
+                }
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+
+        # id keyed on (endpoint, provider), not the "gpu-box" hostname.
+        self.assertIn('id="status-127-0-0-1-11434-ollama"', html)
+        self.assertIn('data-reachable="false"', html)
+        self.assertIn('data-error-kind="timeout"', html)
 
     def test_render_full_page_contains_fragment_and_polling_route(self):
         html = gui.render_full_page({"schema_version": 3, "probed_at": None, "results": []})
@@ -115,7 +147,10 @@ class TestGuiRendering(unittest.TestCase):
         self.assertIn('hx-get="/fragment/hosts"', html)
         self.assertIn("/htmax.js", html)
 
-    def test_render_details_have_stable_ids_with_slugified_hostname(self):
+    def test_render_details_have_stable_ids_from_endpoint(self):
+        # hostname is deliberately weird/free-text here ("GPU Box #1") to
+        # prove it plays no part in id generation any more — only
+        # (endpoint, provider) does.
         env = {
             "schema_version": 3,
             "probed_at": "now",
@@ -139,9 +174,40 @@ class TestGuiRendering(unittest.TestCase):
         }
 
         html = gui.render_cards_fragment(env)
-        # slug("GPU Box #1") -> "gpu-box-1"
-        self.assertIn('id="ld-gpu-box-1"', html)
-        self.assertIn('id="dl-gpu-box-1"', html)
+        self.assertIn('id="ld-127-0-0-1-11434-ollama"', html)
+        self.assertIn('id="dl-127-0-0-1-11434-ollama"', html)
+        self.assertIn('data-count="1"', html)
+        # Old hostname-derived id format must not reappear.
+        self.assertNotIn('id="ld-gpu-box', html)
+        self.assertNotIn('id="dl-gpu-box', html)
+
+    def test_render_cards_fragment_ollama_empty_loaded_and_downloaded_share_ids(self):
+        # Same gap as openai's empty-inventory branch had: the empty-state
+        # "nothing running" / "0 downloaded" branches must still carry
+        # ld-{slug}/dl-{slug} ids and data-count="0", not just the non-empty
+        # <details> branches.
+        env = {
+            "schema_version": 3,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "gpu-box",
+                    "description": "",
+                    "provider": "ollama",
+                    "endpoint": "127.0.0.1:11434",
+                    "reachable": True,
+                    "latency_ms": 12,
+                    "ollama": {"version": "1.0", "loaded": [], "downloaded": []},
+                }
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+
+        self.assertIn('id="ld-127-0-0-1-11434-ollama"', html)
+        self.assertIn('id="dl-127-0-0-1-11434-ollama"', html)
+        # Both blocks are empty, so both data-count="0" markers should appear.
+        self.assertEqual(html.count('data-count="0"'), 2)
 
     def test_render_cards_fragment_openai_provider(self):
         env = {
@@ -170,14 +236,190 @@ class TestGuiRendering(unittest.TestCase):
 
         self.assertIn("llamabox", html)
         self.assertIn("llama.cpp", html)
-        self.assertIn("Available models (v1)", html)
+        # Identify/verify the models block via id + data-count, not display
+        # copy — "Downloaded models" (non-empty) and "Available models"
+        # (empty) label the same concept differently, so tests shouldn't
+        # depend on either wording to know the block is there and populated.
+        self.assertIn('id="oa-192-168-1-40-8080-openai"', html)
+        self.assertIn('data-count="2"', html)
         self.assertIn("qwen2.5-coder-14b", html)
         self.assertIn("gemma-2-9b", html)
         self.assertIn("google", html)
-        self.assertIn('id="oa-llamabox"', html)
+
+    def test_render_cards_fragment_openai_provider_empty_models_shares_id(self):
+        # The empty-inventory branch must expose the same id/data-count
+        # contract as the populated branch above, even though its display
+        # copy ("Available models") differs from the populated branch's
+        # ("Downloaded models").
+        env = {
+            "schema_version": 3,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "llamabox",
+                    "description": "llama.cpp on the NUC",
+                    "provider": "openai",
+                    "endpoint": "192.168.1.40:8080",
+                    "reachable": True,
+                    "latency_ms": 25,
+                    "openai": {"server": "llama.cpp", "models": []},
+                }
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+
+        self.assertIn('id="oa-192-168-1-40-8080-openai"', html)
+        self.assertIn('data-count="0"', html)
+
+    def test_render_cards_fragment_same_hostname_same_provider_no_id_collision(self):
+        # Reproduces the real bug (two macstudio rows in production: native
+        # llama.cpp on :8000 and Ollama's OpenAI-compat shim on :11434, same
+        # hostname, same provider). hostname is user-configurable free text
+        # with no uniqueness guarantee, so it must play no part in id
+        # generation — only (endpoint, provider) does.
+        env = {
+            "schema_version": 3,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "macstudio",
+                    "description": "native llama.cpp",
+                    "provider": "openai",
+                    "endpoint": "192.168.10.5:8000",
+                    "reachable": True,
+                    "latency_ms": 10,
+                    "openai": {"server": "llama.cpp", "models": [{"id": "m1", "owned_by": None}]},
+                },
+                {
+                    "hostname": "macstudio",
+                    "description": "OpenAI-compatible via Ollama",
+                    "provider": "openai",
+                    "endpoint": "192.168.10.5:11434",
+                    "reachable": True,
+                    "latency_ms": 12,
+                    "openai": {"server": "ollama", "models": [{"id": "m2", "owned_by": None}]},
+                },
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+
+        self.assertIn('id="oa-192-168-10-5-8000-openai"', html)
+        self.assertIn('id="oa-192-168-10-5-11434-openai"', html)
+        self.assertIn('id="status-192-168-10-5-8000-openai"', html)
+        self.assertIn('id="status-192-168-10-5-11434-openai"', html)
+
+        # General invariant: no id attribute value repeats anywhere in the
+        # fragment, for any of the two rows' ld-/dl-/oa-/status- ids.
+        ids = re.findall(r'id="([^"]+)"', html)
+        self.assertEqual(len(ids), len(set(ids)), f"duplicate DOM ids: {ids}")
+
+    def test_render_cards_fragment_same_endpoint_different_provider_no_id_collision(self):
+        # The OTHER real case found by cross-checking against
+        # example.llm-fleet.csv: Ollama serves its native API and an
+        # OpenAI-compatible /v1/models shim on the SAME port, so a fleet can
+        # legitimately probe the identical host:port as two different
+        # providers (rows 20 + 40 in example.llm-fleet.csv both hit
+        # 192.168.10.5:11434 — one as ollama, one as openai). endpoint alone
+        # would collide here; only status-{slug} is at risk since ld-/dl-/oa-
+        # already carry a provider-specific prefix, but provider is folded
+        # into the shared slug for all four rather than special-casing one.
+        env = {
+            "schema_version": 3,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "macstudio",
+                    "description": "Ollama native API",
+                    "provider": "ollama",
+                    "endpoint": "192.168.10.5:11434",
+                    "reachable": True,
+                    "latency_ms": 10,
+                    "ollama": {"version": "0.31.1", "loaded": [], "downloaded": []},
+                },
+                {
+                    "hostname": "macstudio",
+                    "description": "OpenAI-compatible shim via Ollama, same port",
+                    "provider": "openai",
+                    "endpoint": "192.168.10.5:11434",
+                    "reachable": True,
+                    "latency_ms": 11,
+                    "openai": {"server": "ollama", "models": []},
+                },
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+
+        self.assertIn('id="status-192-168-10-5-11434-ollama"', html)
+        self.assertIn('id="status-192-168-10-5-11434-openai"', html)
+
+        ids = re.findall(r'id="([^"]+)"', html)
+        self.assertEqual(len(ids), len(set(ids)), f"duplicate DOM ids: {ids}")
 
     def test_render_cards_fragment_whisper_and_piper_summary(self):
-        # Whisper: 1 installed model across 99 langs
+        # Whisper: 1 installed model across 99 langs; Piper: 3 voices across 2 langs.
+        # RECONSTRUCTED — the uploaded file had this method's body replaced by an
+        # unrelated, mis-indented fragment (see test_probe_once_uses_probe_fleet_when_available
+        # below for where that fragment actually belongs). Body rebuilt from gui.py's
+        # actual whisper/piper rendering strings ("{n} models across ~{k} langs",
+        # "{n} voices across {m} langs") rather than recovered — please double-check.
+        env = {
+            "schema_version": 3,
+            "probed_at": "now",
+            "results": [
+                {
+                    "hostname": "voice-stt",
+                    "description": "Whisper STT",
+                    "provider": "whisper",
+                    "endpoint": "127.0.0.1:10300",
+                    "reachable": True,
+                    "latency_ms": 5,
+                    "whisper": {
+                        "program": "mlx-whisper",
+                        "version": "1.4.0",
+                        "models": [
+                            {
+                                "name": "whisper-large-v3-turbo",
+                                "languages": [f"lang{i}" for i in range(99)],
+                            }
+                        ],
+                    },
+                },
+                {
+                    "hostname": "voice-tts",
+                    "description": "Piper TTS",
+                    "provider": "piper",
+                    "endpoint": "127.0.0.1:10200",
+                    "reachable": True,
+                    "latency_ms": 8,
+                    "piper": {
+                        "program": "piper",
+                        "version": "2.2.2",
+                        "voices": [
+                            {"name": "en_US-amy-low", "languages": ["en_US"]},
+                            {"name": "en_US-amy-medium", "languages": ["en_US"]},
+                            {"name": "es_ES-carlfm-x_low", "languages": ["es_ES"]},
+                        ],
+                    },
+                },
+            ],
+        }
+
+        html = gui.render_cards_fragment(env)
+
+        self.assertIn("1 models across ~99 langs", html)
+        self.assertIn("3 voices across 2 langs", html)
+
+    def test_probe_once_uses_probe_fleet_when_available(self):
+        # RECONSTRUCTED — this is the fragment that was incorrectly spliced into
+        # test_render_cards_fragment_whisper_and_piper_summary above (missing its
+        # enclosing `class FakeModule:` / `@staticmethod`, which is why it threw
+        # IndentationError). Logic and assertions are unchanged from the upload,
+        # just given back its own method and proper structure.
+        class FakeModule:
+            @staticmethod
             def probe_fleet(csv_path, timeout):
                 return {"csv_path": csv_path, "timeout": timeout, "results": []}
 

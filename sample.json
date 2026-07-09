@@ -1,6 +1,6 @@
 {
-   "schema_version": 3,
-   "probed_at": "2026-07-04T08:12:04-04:00",
+  "schema_version": 3,
+  "probed_at": "2026-07-04T08:12:04-04:00",
   "results": [
     {
       "sort": 20,
@@ -122,7 +122,8 @@
           }
         ]
       },
-      "piper": null
+      "piper": null,
+      "openai": null
     },
     {
       "sort": 30,
@@ -890,7 +891,7 @@
             ]
           },
           {
-            "name": "pt_PT-tug\u00e3o-medium",
+            "name": "pt_PT-tugão-medium",
             "languages": [
               "pt_PT"
             ]
@@ -1040,7 +1041,8 @@
             ]
           }
         ]
-      }
+      },
+      "openai": null
     },
     {
       "sort": 10,
@@ -1146,7 +1148,8 @@
         ]
       },
       "whisper": null,
-      "piper": null
+      "piper": null,
+      "openai": null
     },
     {
       "sort": 50,
@@ -1388,7 +1391,8 @@
         ]
       },
       "whisper": null,
-      "piper": null
+      "piper": null,
+      "openai": null
     },
     {
       "sort": 40,
@@ -1404,7 +1408,102 @@
       },
       "ollama": null,
       "whisper": null,
-      "piper": null
+      "piper": null,
+      "openai": null
+    },
+    {
+      "sort": 5,
+      "hostname": "mmm4-openai",
+      "description": "rapid-mlx OpenAI-compatible endpoint in Mac mini M4 24GB",
+      "endpoint": "192.168.10.3:8000",
+      "provider": "openai",
+      "reachable": true,
+      "latency_ms": 7,
+      "error": null,
+      "ollama": null,
+      "whisper": null,
+      "piper": null,
+      "openai": {
+        "server": "llama.cpp (mlx)",
+        "models": [
+          {
+            "id": "qwen2.5-coder-14b-mlx",
+            "owned_by": "mlx-community"
+          },
+          {
+            "id": "gemma-3-12b-it-mlx",
+            "owned_by": null
+          }
+        ]
+      }
+    },
+    {
+      "sort": 60,
+      "hostname": "macstudio-openai-locked",
+      "description": "OpenAI-compatible endpoint behind an API key (unsupported)",
+      "endpoint": "192.168.10.5:8001",
+      "provider": "openai",
+      "reachable": false,
+      "latency_ms": null,
+      "error": {
+        "kind": "auth",
+        "detail": "endpoint requires an API key (not supported)"
+      },
+      "ollama": null,
+      "whisper": null,
+      "piper": null,
+      "openai": null
+    },
+    {
+      "sort": 70,
+      "hostname": "gpu-box-down",
+      "description": "Ollama not running on this box",
+      "endpoint": "192.168.10.9:11434",
+      "provider": "ollama",
+      "reachable": false,
+      "latency_ms": null,
+      "error": {
+        "kind": "refused",
+        "detail": "[Errno 111] Connection refused"
+      },
+      "ollama": null,
+      "whisper": null,
+      "piper": null,
+      "openai": null
+    },
+    {
+      "sort": 80,
+      "hostname": "voice-stt-typo",
+      "description": "Wyoming whisper - unresolvable hostname (typo in CSV)",
+      "endpoint": "voice-sttt.local:10300",
+      "provider": "whisper",
+      "reachable": false,
+      "latency_ms": null,
+      "error": {
+        "kind": "dns",
+        "detail": "[Errno -2] Name or service not known"
+      },
+      "ollama": null,
+      "whisper": null,
+      "piper": null,
+      "openai": null
+    },
+    {
+      "sort": 90,
+      "hostname": "voice-tts-mismatch",
+      "description": "Wyoming piper - connection dropped mid-handshake",
+      "endpoint": "192.168.10.3:10201",
+      "provider": "piper",
+      "reachable": false,
+      "latency_ms": null,
+      "error": {
+        "kind": "protocol",
+        "detail": "closed before info"
+      },
+      "ollama": null,
+      "whisper": null,
+      "piper": null,
+      "openai": null
     }
   ]
 }

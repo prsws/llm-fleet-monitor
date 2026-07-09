@@ -71,7 +71,7 @@ cd /opt/llm-fleet-monitor
 
 ## 7. Configure the Host List
 The monitor reads a CSV file with one row per service endpoint. A single row must select exactly one service type: Ollama, Whisper, Piper, or OpenAI-compatible.
-The sort column must not be empty and in case of collisions the gui adds the hostname to disambiguate.
+The sort column must not be empty and controls the dashboard's display order (ties are broken by `endpoint`, never `hostname`). Dashboard card element ids are likewise derived from `endpoint` and provider, not `hostname` — `hostname` is a free-text, user-configurable label with no format constraints or uniqueness requirement, and may repeat across rows without causing display collisions (e.g. one physical box probed on multiple ports/providers under the same hostname label).
 ```
 cd /opt/llm-fleet-monitor
 cp example.llm-fleet.csv llm-fleet.csv
@@ -127,6 +127,8 @@ _If you want to expose the dashboard publicly, edit gui.py and change its defaul
 
 ## 10. Create a systemd Service for the Dashboard
 Create a service so the dashboard starts automatically when the LXC boots.
+
+gui.py never writes to disk at runtime — the probe result cache lives in memory only, there are no log/state files (journald captures stdout/stderr), and CSV/style/image/htmax assets are opened read-only. The unit below reflects that: `ProtectSystem=strict` mounts the entire filesystem read-only for the service with no `ReadWritePaths=` carved out at all, rather than the more common `full` + an explicit writable app directory. Editing `llm-fleet.csv` (Section 7) is a separate, manual root/sudo shell action outside this service's process tree, so it's unaffected by this sandboxing.
 ```
 cat > /etc/systemd/system/llm-fleet-dashboard.service <<'EOF'
 [Unit]
@@ -144,9 +146,8 @@ Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
+ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/llm-fleet-monitor
 
 [Install]
 WantedBy=multi-user.target
