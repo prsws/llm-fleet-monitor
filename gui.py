@@ -32,6 +32,7 @@ import signal
 import sys
 import threading
 import time
+from datetime import datetime
 from hashlib import sha256
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -70,14 +71,100 @@ def import_probe_module(path: Path):
 # ------------------------- Cache -------------------------
 
 _cache_lock = threading.RLock()
-_cached_envelope: Dict[str, Any] = {"schema_version": 3, "probed_at": None, "results": []}
+_cached_envelope: Dict[str, Any] = {"schema_version": 4, "probed_at": None, "results": []}
+
+
+def _iso_to_epoch(ts: Any) -> Optional[float]:
+    if not isinstance(ts, str):
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
+def _rmlx_key(rec: Dict[str, Any]):
+    # endpoint alone is not unique: one host:port may appear under two
+    # providers (see the ollama/openai pair on the Studio).
+    return (rec.get("endpoint"), rec.get("provider"))
+
+
+def annotate_rapidmlx_deltas(new_env: Dict[str, Any], prev_env: Dict[str, Any]) -> None:
+    """Attach `activity.delta` to each rapid-mlx record, in place.
+
+    rapid-mlx keeps models resident forever: no keep-alive TTL, no
+    loaded/unloaded transition. `total_requests_processed` is the only latched
+    signal a poller can use — monotonic, so a 3 s inference that starts and
+    ends between two polls still moves it.
+
+    Restart guard: a counter that moves BACKWARDS, or an uptime that shrinks,
+    means the server was restarted. Emit `restarted: true` and a null delta.
+    Never emit a negative — a negative here would read as "negative requests"
+    on the card and quietly corrupt any rate built on top of it.
+    """
+    prev: Dict[Any, Dict[str, Any]] = {}
+    for rec in prev_env.get("results", []) or []:
+        if rec.get("provider") != "rapidmlx":
+            continue
+        act = ((rec.get("rapidmlx") or {}).get("activity")) or None
+        if act:
+            prev[_rmlx_key(rec)] = act
+
+    t_new = _iso_to_epoch(new_env.get("probed_at"))
+    t_old = _iso_to_epoch(prev_env.get("probed_at"))
+    interval = (t_new - t_old) if (t_new and t_old and t_new > t_old) else None
+
+    for rec in new_env.get("results", []) or []:
+        if rec.get("provider") != "rapidmlx":
+            continue
+        act = ((rec.get("rapidmlx") or {}).get("activity")) or None
+        if not act:
+            continue
+        pa = prev.get(_rmlx_key(rec))
+        if not pa:
+            act["delta"] = None          # first sighting; nothing to diff yet
+            continue
+
+        cur_r, prev_r = act.get("total_requests_processed"), pa.get("total_requests_processed")
+        cur_u, prev_u = act.get("uptime_s"), pa.get("uptime_s")
+
+        restarted = False
+        if isinstance(cur_u, (int, float)) and isinstance(prev_u, (int, float)) and cur_u < prev_u:
+            restarted = True
+        if isinstance(cur_r, int) and isinstance(prev_r, int) and cur_r < prev_r:
+            restarted = True
+
+        if restarted or not (isinstance(cur_r, int) and isinstance(prev_r, int)):
+            act["delta"] = {"restarted": restarted, "requests": None,
+                            "interval_s": interval, "hit_rate": None}
+            continue
+
+        cc, pc = act.get("cache") or {}, pa.get("cache") or {}
+        dh = dm = None
+        recent_hit_rate = None
+        if all(isinstance(x, int) for x in (cc.get("hits"), pc.get("hits"),
+                                            cc.get("misses"), pc.get("misses"))):
+            dh, dm = cc["hits"] - pc["hits"], cc["misses"] - pc["misses"]
+            if dh >= 0 and dm >= 0 and (dh + dm) > 0:
+                recent_hit_rate = dh / (dh + dm)
+
+        act["delta"] = {
+            "restarted": False,
+            "requests": cur_r - prev_r,
+            "interval_s": interval,
+            "hits": dh,
+            "misses": dm,
+            "hit_rate": recent_hit_rate,
+        }
 
 
 def set_envelope(env: Dict[str, Any]) -> None:
     with _cache_lock:
+        env = json.loads(json.dumps(env))
+        annotate_rapidmlx_deltas(env, _cached_envelope)
         # store a deep-ish copy to avoid mutation surprises
         _cached_envelope.clear()
-        _cached_envelope.update(json.loads(json.dumps(env)))
+        _cached_envelope.update(env)
 
 
 def get_envelope() -> Dict[str, Any]:
@@ -147,6 +234,22 @@ def envelope_ptag(env: Dict[str, Any]) -> str:
                 loaded.append(mm)
             o["loaded"] = loaded
             r["ollama"] = o
+        elif prov == "rapidmlx" and isinstance(r.get("rapidmlx"), dict):
+            # Volatile every poll: uptime ticks, tps floats, interval jitters,
+            # metal.active wobbles. Left in, they'd change the tag on every
+            # sweep and defeat the no-op-swap suppression this hash exists for.
+            rm = json.loads(json.dumps(r["rapidmlx"]))
+            act = rm.get("activity")
+            if isinstance(act, dict):
+                for k in ("uptime_s", "generation_tps", "prompt_tps"):
+                    act.pop(k, None)
+                metal = act.get("metal")
+                if isinstance(metal, dict) and isinstance(metal.get("active_memory_gb"), (int, float)):
+                    metal["active_memory_gb"] = round(metal["active_memory_gb"], 1)
+                d = act.get("delta")
+                if isinstance(d, dict):
+                    d.pop("interval_s", None)
+            r["rapidmlx"] = rm
         # whisper/piper blocks are kept as-is
 
         norm_results.append(r)
@@ -271,7 +374,7 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                 "</header>"
             )
             # Endpoint + Reachability as a compact 2-column table (no <mark>, shared style with model tables)
-            tag_txt = {"ollama": "ollama", "whisper": "whisper/wyoming", "piper": "piper/wyoming"}.get(provider, provider)
+            tag_txt = {"ollama": "ollama", "whisper": "whisper/wyoming", "piper": "piper/wyoming", "rapidmlx": "rapid-mlx"}.get(provider, provider)
             # Build status cell content preserving existing wording except bold NO
             if reachable:
                 lat = f"{int(latency_ms)} ms" if isinstance(latency_ms, int) else "?"
@@ -404,6 +507,101 @@ def render_cards_fragment(env: Dict[str, Any]) -> str:
                                 lang_set.add(lg)
                     m = len(lang_set)
                     parts.append(f"<p>{n} voices across {m} langs</p>")
+
+            elif reachable and provider == "rapidmlx" and rec.get("rapidmlx"):
+                d = rec["rapidmlx"] or {}
+                server = (d.get("server") or "").strip()
+                if server:
+                    parts.append(f"<p><strong>Server</strong> {html_escape(server)}</p>")
+                parts.append(f"<p><strong>Residency</strong> {html_escape(str(d.get('residency','?')))}</p>")
+
+                a = d.get("activity") or None
+                if not a:
+                    why = html_escape(str(d.get("activity_unavailable") or "unknown"))
+                    parts.append(f"<p class=\"red-blink\">Activity unavailable — {why}</p>")
+                    parts.append("<p><small>No request counter; escalation not observable by polling.</small></p>")
+                else:
+                    rows: List[str] = []
+                    up = a.get("uptime_s")
+                    up_txt = f"{up/3600:.1f}h" if isinstance(up, (int, float)) else "?"
+                    rows.append(f"<tr><td>state</td><td>{html_escape(str(a.get('state') or '?'))} · up {up_txt}</td></tr>")
+
+                    delta = a.get("delta") or None
+                    total = a.get("total_requests_processed")
+                    if delta is None:
+                        d_txt = "<small>baseline</small>"
+                    elif delta.get("restarted"):
+                        d_txt = "<span class=\"red-blink\">server restarted</span>"
+                    elif delta.get("requests"):
+                        n = delta["requests"]
+                        iv = delta.get("interval_s")
+                        iv_txt = f" in {iv:.0f}s" if isinstance(iv, (int, float)) else ""
+                        d_txt = f"<span class=\"property-name-alt2\">+{n}{iv_txt}</span>"
+                    else:
+                        d_txt = "<small>idle</small>"
+                    rows.append(f"<tr><td>requests</td><td>{total} processed · {d_txt}</td></tr>")
+                    rows.append(f"<tr><td>queue</td><td>running {a.get('num_running')} · waiting {a.get('num_waiting')}</td></tr>")
+
+                    pt, ct_ = a.get("total_prompt_tokens"), a.get("total_completion_tokens")
+                    if isinstance(pt, int) and isinstance(ct_, int):
+                        ratio = f"{pt//ct_}:1" if ct_ else "?"
+                        rows.append(f"<tr><td>tokens</td><td>{pt:,} in / {ct_:,} out · {ratio} prefill-heavy</td></tr>")
+
+                    c = a.get("cache") or {}
+                    hr = c.get("hit_rate")
+                    if hr is not None:
+                        cell = f"{hr*100:.1f}% lifetime ({c.get('hits')}h/{c.get('misses')}m)"
+                        rhr = (delta or {}).get("hit_rate")
+                        if rhr is not None:
+                            cell += f" · {rhr*100:.0f}% recent"
+                        rows.append(f"<tr><td>cache</td><td>{cell}</td></tr>")
+                        util, ev, ent = c.get("memory_utilization"), c.get("evictions"), c.get("entry_count")
+                        warn = []
+                        if isinstance(util, float) and util > 0.85:
+                            warn.append(f"mem {util*100:.0f}% full")
+                        if isinstance(ev, int) and isinstance(ent, int) and ev > ent:
+                            warn.append("evicting more than it holds")
+                        rows.append(f"<tr><td>entries</td><td>{ent} · {ev} evictions</td></tr>")
+                        if warn:
+                            rows.append(
+                                "<tr><td>&nbsp;</td><td class=\"red-blink\">THRASHING — "
+                                + html_escape("; ".join(warn)) + "</td></tr>"
+                            )
+
+                    mtl = a.get("metal") or {}
+                    if mtl.get("active_memory_gb") is not None:
+                        rows.append(
+                            f"<tr><td>metal</td><td>active {mtl['active_memory_gb']:.2f} GB · "
+                            f"peak {mtl.get('peak_memory_gb', 0):.2f} GB</td></tr>"
+                        )
+                    parts.append("<table class=\"status-table\"><tbody>" + "".join(rows) + "</tbody></table>")
+
+                models = d.get("models") or []
+                if models:
+                    parts.append(
+                        f"<details id=\"rm-{slug}\" data-count=\"{len(models)}\" hx-preserve>"
+                        f"<summary><strong>Resident models</strong>: {len(models)}</summary>"
+                    )
+                    for m in models:
+                        model_id = html_escape(str(m.get("id") or "?"))
+                        mrows = [f"<tr><td colspan=\"2\" class=\"property-name-alt\">{model_id}</td></tr>"]
+                        for label, key in (("tools", "tool_call_parser"), ("reasoning", "reasoning_parser")):
+                            if m.get(key):
+                                mrows.append(f"<tr><td>{label}</td><td>{html_escape(str(m[key]))}</td></tr>")
+                        badges = []
+                        if m.get("is_hybrid"):
+                            badges.append("HYBRID — prefix cache suspect (#163)")
+                        if m.get("is_moe"):
+                            badges.append("MoE")
+                        if m.get("supports_spec_decode"):
+                            badges.append("spec-decode")
+                        if badges:
+                            cls = "red-blink" if m.get("is_hybrid") else "property-value"
+                            mrows.append(f"<tr><td>flags</td><td class=\"{cls}\">{html_escape('  '.join(badges))}</td></tr>")
+                        parts.append("<table class=\"model-table\"><tbody>" + "".join(mrows) + "</tbody></table>")
+                    parts.append("</details>")
+                else:
+                    parts.append(f"<p id=\"rm-{slug}\" data-count=\"0\"><strong>Resident models</strong>: 0</p>")
 
             elif reachable and provider == "openai" and rec.get("openai"):
                 o = rec["openai"] or {}
@@ -627,7 +825,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 env = json.load(f)
         except FileNotFoundError:
             # Graceful fallback if sample.json is absent
-            env = {"schema_version": 3, "probed_at": None, "results": []}
+            env = {"schema_version": 4, "probed_at": None, "results": []}
         set_envelope(env)
         mod = None
     else:
@@ -648,7 +846,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         except Exception as e:
             # Don't crash the server on initial failure; show zero-state page
             sys.stderr.write(f"initial probe failed: {e}\n")
-            set_envelope({"schema_version": 3, "probed_at": None, "results": []})
+            set_envelope({"schema_version": 4, "probed_at": None, "results": []})
 
     # Start background refresher if not in fixture mode
     stop_evt = threading.Event()
