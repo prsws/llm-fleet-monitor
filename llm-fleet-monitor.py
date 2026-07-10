@@ -361,6 +361,275 @@ def probe_openai(host: str, port: int, timeout: float) -> Tuple[bool, Optional[i
         return False, None, None, {"kind": kind, "detail": detail}
 
 
+# Prometheus family-name fragments worth diffing. Permissive on purpose: the
+# build may rename families, and an unmatched counter still shows up in
+# `families` so it is diagnosable without another round trip.
+_COUNTER_HINTS = ("request", "prompt_token", "generation_token", "completion_token")
+# Histogram families we summarise as mean = _sum / _count.
+_HISTOGRAM_HINTS = ("latency", "duration", "ttft", "time_to_first_token")
+
+
+def http_get_text(host: str, port: int, path: str, timeout: float) -> Tuple[str, int]:
+    url = urlunparse(("http", f"{host}:{port}", path, "", "", ""))
+    req = Request(url, headers={"Accept": "text/plain"})
+    with urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace"), resp.status
+
+
+def parse_prometheus(body: str) -> Dict[str, float]:
+    """Prometheus text exposition -> {family_name: summed_value}.
+
+    Labels are dropped and values summed per family. We want one number per
+    family to diff across polls, not a label cube. Histogram `_sum` / `_count`
+    survive as their own families, which is what summarise_histograms needs.
+    Malformed lines are skipped.
+    """
+    out: Dict[str, float] = {}
+    for line in body.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        brace = line.find("{")
+        if brace != -1:
+            end = line.find("}", brace)
+            if end == -1:
+                continue
+            name, rest = line[:brace], line[end + 1:]
+        else:
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                continue
+            name, rest = parts
+        try:
+            val = float(rest.strip().split()[0])
+        except (ValueError, IndexError):
+            continue
+        out[name] = out.get(name, 0.0) + val
+    return out
+
+
+def summarise_histograms(families: Dict[str, float]) -> Dict[str, float]:
+    """Mean = _sum / _count for each histogram family.
+
+    Not a percentile. Bucket interpolation across a 10 s poll would be noise;
+    the lifetime mean is a stable, honest number, and diffing successive
+    (_sum, _count) pairs in gui.py yields the per-interval mean.
+    """
+    means: Dict[str, float] = {}
+    for name, total in families.items():
+        if not name.endswith("_sum"):
+            continue
+        base = name[:-4]
+        if not any(h in base.lower() for h in _HISTOGRAM_HINTS):
+            continue
+        count = families.get(base + "_count", 0.0)
+        if count > 0:
+            means[base] = total / count
+    return means
+
+
+def _try_get_text(host: str, port: int, path: str, timeout: float):
+    """GET returning (body, None) or (None, error_string). Never raises."""
+    try:
+        body, status = http_get_text(host, port, path, timeout)
+        if status == 200:
+            return body, None
+        return None, f"status {status}"
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"
+
+
+def _try_get_json(host: str, port: int, path: str, timeout: float):
+    """GET JSON returning (obj, None) or (None, error_string). Never raises."""
+    body, err = _try_get_text(host, port, path, timeout)
+    if body is None:
+        return None, err
+    try:
+        return json.loads(body), None
+    except Exception as e:
+        return None, f"bad json: {e}"
+
+
+# READ-ONLY routes only. rapid-mlx also exposes /v1/cache/clear,
+# /v1/cache/import and /v1/requests/{id}/cancel -- these MUTATE server state.
+# Never add them to a probe, health check, or dashboard poll.
+_RO_STATUS = "/v1/status"
+_RO_MODELS = "/v1/models"
+_RO_HEALTH = "/health"      # confirmed present; /v1/health is NOT (404)
+_RO_METRICS = "/metrics"
+
+
+def probe_rapidmlx(
+    host: str, port: int, timeout: float
+) -> Tuple[bool, Optional[int], Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
+    """Probe a rapid-mlx server.
+
+    Liveness + inventory -> /v1/models  (the one route every build serves)
+    Activity + cache + memory -> /v1/status
+
+    /v1/status carries `total_requests_processed`, a monotonic counter. That is
+    the LATCH: a 3 s inference beginning and ending between two 10 s polls still
+    increments it. rapid-mlx keeps models resident forever, so it has no
+    keep-alive TTL and no loaded/unloaded transition -- this counter is the only
+    way a poller can see the server do work.
+
+    It also reports metal.active/peak_memory_gb, which is authoritative. Do not
+    infer rapid-mlx's footprint from a process RSS column: on macOS, per-process
+    accounting does not attribute Metal buffers back to the owning process.
+    """
+    start = time.perf_counter()
+    try:
+        data, server = http_get_json_with_headers(host, port, _RO_MODELS, timeout)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+    except Exception as e:
+        kind, detail = classify_error(e)
+        return False, None, None, {"kind": kind, "detail": detail}
+
+    models: List[Dict[str, Any]] = []
+    for entry in data.get("data", []) or []:
+        model_id = entry.get("id")
+        if not model_id:
+            continue
+        models.append({
+            "id": model_id,
+            "owned_by": _norm(entry.get("owned_by")),
+            "tool_call_parser": _norm(entry.get("tool_call_parser")),
+            "reasoning_parser": _norm(entry.get("reasoning_parser")),
+            "is_hybrid": bool(entry.get("is_hybrid")),
+            "is_moe": bool(entry.get("is_moe")),
+            "supports_spec_decode": bool(entry.get("supports_spec_decode")),
+        })
+
+    health = None
+    hbody, _ = _try_get_text(host, port, _RO_HEALTH, timeout)
+    if hbody is not None:
+        health = hbody.strip()[:120]
+
+    status_obj, status_err = _try_get_json(host, port, _RO_STATUS, timeout)
+    activity: Optional[Dict[str, Any]] = None
+    if status_obj:
+        cache = status_obj.get("cache") or {}
+        metal = status_obj.get("metal") or {}
+        activity = {
+            "state": status_obj.get("status"),
+            "model": status_obj.get("model"),
+            "uptime_s": status_obj.get("uptime_s"),
+            # The latch. Diff across polls in gui.py.
+            "total_requests_processed": status_obj.get("total_requests_processed"),
+            "total_prompt_tokens": status_obj.get("total_prompt_tokens"),
+            "total_completion_tokens": status_obj.get("total_completion_tokens"),
+            "num_running": status_obj.get("num_running"),
+            "num_waiting": status_obj.get("num_waiting"),
+            "generation_tps": status_obj.get("generation_tps"),
+            "prompt_tps": status_obj.get("prompt_tps"),
+            "cache": {
+                "hits": cache.get("hits"),
+                "misses": cache.get("misses"),
+                "hit_rate": cache.get("hit_rate"),
+                "evictions": cache.get("evictions"),
+                "entry_count": cache.get("entry_count"),
+                "tokens_saved": cache.get("tokens_saved"),
+                "memory_utilization": cache.get("memory_utilization"),
+            },
+            "metal": {
+                "active_memory_gb": metal.get("active_memory_gb"),
+                "peak_memory_gb": metal.get("peak_memory_gb"),
+            },
+        }
+
+    result = {
+        "server": server,
+        # Resident for the life of the process. No TTL, no eviction, no VRAM
+        # spill (unified memory). Residency is a server property, not per-model.
+        "residency": "resident (no eviction)",
+        "health": health,
+        "models": models,
+        "model_count": len(models),
+        "activity": activity,
+        "activity_unavailable": status_err if activity is None else None,
+    }
+    return True, latency_ms, result, None
+
+
+def _pct(v):
+    return "—" if v is None else f"{v * 100:.1f}%"
+
+
+def render_rapidmlx(rec: Dict[str, Any], verbose: bool) -> List[str]:
+    d = rec.get("rapidmlx") or {}
+    lines: List[str] = []
+    if d.get("server"):
+        lines.append(f"  server     {d['server']}")
+    lines.append(f"  residency  {d.get('residency', 'unknown')}")
+
+    models = d.get("models") or []
+    lines.append(f"  serving    {len(models)} model(s)")
+    shown = models if verbose else models[:3]
+    for m in shown:
+        badges = []
+        if m.get("is_hybrid"):
+            # Upstream #163: on hybrid models the prefix cache stores entries
+            # but never serves them.
+            badges.append("HYBRID — prefix cache suspect (#163)")
+        if m.get("is_moe"):
+            badges.append("MoE")
+        if m.get("supports_spec_decode"):
+            badges.append("spec-decode")
+        parser = m.get("tool_call_parser") or "—"
+        reason = m.get("reasoning_parser") or "—"
+        lines.append(f"    {m['id']}  tools:{parser}  reasoning:{reason}")
+        if badges:
+            lines.append(f"      {'  '.join(badges)}")
+    if not verbose and len(models) > 3:
+        lines.append(f"    … and {len(models) - 3} more")
+
+    a = d.get("activity")
+    if not a:
+        why = d.get("activity_unavailable") or "unknown"
+        lines.append(f"  activity   UNAVAILABLE — {why}")
+        lines.append("             no request counter; escalation not observable by polling")
+        return lines
+
+    up = a.get("uptime_s")
+    up_txt = f"{up / 3600:.1f}h" if isinstance(up, (int, float)) else "—"
+    lines.append(f"  state      {a.get('state') or '—'}   uptime {up_txt}")
+    lines.append(
+        f"  requests   {a.get('total_requests_processed')} processed"
+        f"   running {a.get('num_running')}   waiting {a.get('num_waiting')}"
+    )
+    pt, ct = a.get("total_prompt_tokens"), a.get("total_completion_tokens")
+    if isinstance(pt, int) and isinstance(ct, int):
+        ratio = f"{pt / ct:.0f}:1" if ct else "—"
+        lines.append(f"  tokens     prompt {pt:,}  completion {ct:,}  ({ratio} prefill-heavy)")
+
+    c = a.get("cache") or {}
+    if c.get("hits") is not None:
+        line = (f"  cache      hit {_pct(c.get('hit_rate'))}"
+                f"  ({c.get('hits')}h/{c.get('misses')}m)"
+                f"  entries {c.get('entry_count')}  evictions {c.get('evictions')}")
+        lines.append(line)
+        util = c.get("memory_utilization")
+        ev, ent = c.get("evictions"), c.get("entry_count")
+        warn = []
+        if isinstance(util, float) and util > 0.85:
+            warn.append(f"mem {_pct(util)} full")
+        if isinstance(ev, int) and isinstance(ent, int) and ev > ent:
+            warn.append("evicting more than it holds")
+        if warn:
+            lines.append(f"             THRASHING — {'; '.join(warn)}")
+        ts = c.get("tokens_saved")
+        if isinstance(ts, int):
+            lines.append(f"             tokens saved {ts:,}")
+
+    m = a.get("metal") or {}
+    if m.get("active_memory_gb") is not None:
+        lines.append(
+            f"  metal      active {m['active_memory_gb']:.2f} GB"
+            f"   peak {m.get('peak_memory_gb', 0):.2f} GB"
+        )
+    return lines
+
+
 # ------------------------- CSV & Orchestration -------------------------
 
 
@@ -370,7 +639,7 @@ class Row:
     hostname: str
     description: str
     endpoint: str
-    provider: str  # "ollama" | "whisper" | "piper" | "openai"
+    provider: str  # "ollama" | "whisper" | "piper" | "openai" | "rapidmlx"
 
 
 def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
@@ -379,7 +648,7 @@ def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
     try:
         with open(csv_path, newline='', encoding='utf-8') as f:
             rdr = csv.DictReader(f)
-            required = ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper", "openai"]
+            required = ["sort", "hostname", "description", "endpoint", "ollama", "whisper", "piper", "openai", "rapidmlx"]
             missing = [c for c in required if c not in (rdr.fieldnames or [])]
             if missing:
                 raise ValueError(f"CSV missing required column(s): {', '.join(missing)}")
@@ -406,6 +675,7 @@ def read_rows(csv_path: str) -> Tuple[List[Row], List[str]]:
                         "whisper": parse_bool(r.get("whisper")),
                         "piper": parse_bool(r.get("piper")),
                         "openai": parse_bool(r.get("openai")),
+                        "rapidmlx": parse_bool(r.get("rapidmlx")),
                     }
                     true_flags = [k for k, v in flags.items() if v]
                     if len(true_flags) != 1:
@@ -444,6 +714,7 @@ def build_record(row: Row, timeout: float) -> Dict[str, Any]:
         "whisper": None,
         "piper": None,
         "openai": None,
+        "rapidmlx": None,
     }
     if row.provider == "ollama":
         ok, latency, data, err = probe_ollama(host, port, timeout)
@@ -463,6 +734,12 @@ def build_record(row: Row, timeout: float) -> Dict[str, Any]:
         base["latency_ms"] = latency
         base["error"] = err
         base["openai"] = data if ok else None
+    elif row.provider == "rapidmlx":
+        ok, latency, data, err = probe_rapidmlx(host, port, timeout)
+        base["reachable"] = ok
+        base["latency_ms"] = latency
+        base["error"] = err
+        base["rapidmlx"] = data if ok else None
     else:
         base["error"] = {"kind": "other", "detail": f"unknown provider {row.provider}"}
     return base
@@ -493,6 +770,7 @@ def run_probe(rows: List[Row], timeout: float, max_workers: int = 16) -> Dict[st
                     "whisper": None,
                     "piper": None,
                     "openai": None,
+                    "rapidmlx": None,
                 }
             results.append(rec)
     # Sort results deterministically by (sort, endpoint). endpoint, not
@@ -501,7 +779,7 @@ def run_probe(rows: List[Row], timeout: float, max_workers: int = 16) -> Dict[st
     # expected to repeat across rows for the same physical box.
     results.sort(key=lambda rec: (rec.get("sort", 0), rec.get("endpoint") or ""))
     # Phase 2A: add stable top-level schema version for machine-consumable output
-    return {"schema_version": 3, "probed_at": probed_at, "results": results}
+    return {"schema_version": 4, "probed_at": probed_at, "results": results}
 
 
 # ------------------------- Importable API -------------------------
@@ -539,6 +817,7 @@ def render_text(envelope: Dict[str, Any], *, verbose: bool = False) -> str:
             "whisper": "whisper/wyoming",
             "piper": "piper/wyoming",
             "openai": "openai",
+            "rapidmlx": "rapid-mlx",
         }.get(provider, provider)
         lines.append(f"  endpoint   {endpoint}  [{tag}]")
         # Reachability
@@ -665,6 +944,9 @@ def render_text(envelope: Dict[str, Any], *, verbose: bool = False) -> str:
                     # Default: comma-joined ids on wrapped lines
                     ids = [m.get("id") or "?" for m in models]
                     lines.append("    " + ", ".join(ids))
+
+        elif provider == "rapidmlx" and rec.get("rapidmlx"):
+            lines.extend(render_rapidmlx(rec, verbose))
 
         lines.append("")  # blank line between blocks
     return "\n".join(lines).rstrip() + "\n"
